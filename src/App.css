@@ -1,5 +1,5 @@
 #root {
-  max-width: 1280px;
+  max-width: 1580px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
@@ -12,7 +12,7 @@
   transition: filter 300ms;
 }
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+  filter: drop-shadow(0 0 2em #e9e6e4aa);
 }
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
@@ -33,10 +33,41 @@
   }
 }
 
-.card {
-  padding: 2em;
-}
-
 .read-the-docs {
   color: #888;
+}
+
+.section {
+  margin-top: 1rem;
+}
+
+.card {
+  text-align: left;
+  width: 100%;
+  margin: 1rem auto; 
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(8, 8, 8, 0.1);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card-header {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.icon-big {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-category {
+  font-size: 1rem;
+  color: #0e0b0b;
+}
+
+.card-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin: 0;
 }
