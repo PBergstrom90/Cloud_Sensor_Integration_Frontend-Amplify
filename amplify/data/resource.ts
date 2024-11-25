@@ -5,6 +5,10 @@ import {
   defineFunction,
 } from "@aws-amplify/backend";
 
+const echoHandler = defineFunction({
+  entry: './echo-handler/handler.ts'
+})
+
 const schema = a.schema({
   telemetry: a
     .model({
@@ -28,7 +32,8 @@ const schema = a.schema({
     }
     )
     .returns(a.ref("telemetry"))
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.publicApiKey()])
+    .handler(a.handler.function(echoHandler)),
 
   devices: a
     .model({
