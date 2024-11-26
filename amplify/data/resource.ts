@@ -42,7 +42,20 @@ const schema = a.schema({
       status: a.string(),
     })
     .identifier(['device_id'])
-    .authorization((allow) => [allow.owner(), allow.publicApiKey()])
+    .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
+
+    weatherStationData: a
+    .model({
+      stationKey: a.string().required(), // Partition key
+      timestamp: a.timestamp().required(), // Sort key
+      temperature: a.float(), // Temperature value
+      quality: a.string(), // Quality of data (e.g., "G")
+      latitude: a.float(), // GPS Latitude
+      longitude: a.float(), // GPS Longitude
+      stationName: a.string(), // Station name
+    })
+    .identifier(['stationKey', 'timestamp'])
+    .authorization((allow) => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

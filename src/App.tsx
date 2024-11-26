@@ -35,11 +35,19 @@ ChartJS.register(
 
 const client = generateClient<Schema>();
 
+
 function App() {
   const [telemetries, setTelemetry] = useState<Array<Schema["telemetry"]["type"]>>([]);
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
+  const [weatherStationData, setWeatherStationData] = useState<Array<Schema["weatherStationData"]["type"]>>([]);
 
   const { user, signOut } = useAuthenticator();
+
+  useEffect(() => {
+    client.models.weatherStationData.observeQuery().subscribe({
+      next: (data) => setWeatherStationData([...data.items]),
+    });
+  }, []);
 
   useEffect(() => {
     client.models.telemetry.observeQuery().subscribe({
