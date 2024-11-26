@@ -182,6 +182,93 @@ function App() {
       easing: "easeOutQuart",
     },
   };
+
+  const smhiChartData = {
+    labels: weatherStationData.map((data) =>
+      moment(data.timestamp).format("HH:mm:ss")
+    ),
+    datasets: [
+      {
+        label: "SMHI Temperature",
+        data: weatherStationData.map((data) => data.temperature),
+        borderColor: "rgba(54, 162, 235, 1)", // Blue
+        backgroundColor: "rgba(54, 162, 235, 0.3)", // Light Blue
+        fill: true,
+        tension: 0.4,
+        pointStyle: "circle",
+        pointRadius: 4,
+        pointHoverRadius: 8,
+      },
+    ],
+  };
+  
+  const smhiChartOptions: ChartOptions<"line"> = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: "top",
+        labels: {
+          font: {
+            size: 14,
+          },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (tooltipItem) =>
+            `${tooltipItem.dataset.label}: ${tooltipItem.raw}°C`,
+        },
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        titleFont: {
+          size: 14,
+          weight: "bold",
+        },
+        bodyFont: {
+          size: 12,
+        },
+      },
+      title: {
+        display: true,
+        text: "SMHI Weather Data",
+        font: {
+          size: 15,
+          weight: "normal",
+        },
+        color: "#fff",
+      },
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 12,
+          },
+          color: "#ddd",
+        },
+      },
+      y: {
+        type: "linear",
+        display: true,
+        position: "left",
+        grid: {
+          color: "rgba(54, 162, 235, 0.2)",
+        },
+        ticks: {
+          font: {
+            size: 12,
+          },
+          color: "#ddd",
+        },
+      },
+    },
+    animation: {
+      duration: 1000,
+      easing: "easeOutQuart",
+    },
+  };
   
   return (
     <Box p={6} sx={{ display: "flex", 
@@ -321,6 +408,26 @@ function App() {
     <Line data={chartData} options={chartOptions} />
   </CardContent>
 </Card>
+
+{/* SMHI Weather Data Chart Section */}
+<Card
+  sx={{
+    mb: 3,
+    width: "110%",
+    maxWidth: "1100px",
+    backgroundColor: "#1a1a2e",
+    color: "#fff",
+  }}
+>
+  <CardContent>
+  <Typography variant="subtitle1" textAlign="center">
+    Station: {weatherStationData[0]?.stationName || "N/A"} <br />
+    Location: {weatherStationData[0]?.latitude}, {weatherStationData[0]?.longitude}
+  </Typography>
+    <Line data={smhiChartData} options={smhiChartOptions} />
+  </CardContent>
+</Card>
+
 
 {/* Sign Out Button */}
 <Button variant="contained" color="secondary" 

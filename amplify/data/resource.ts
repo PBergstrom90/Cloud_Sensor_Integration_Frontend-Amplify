@@ -52,6 +52,7 @@ const schema = a.schema({
       quality: a.string(), // Quality of data (e.g., "G")
       latitude: a.float(), // GPS Latitude
       longitude: a.float(), // GPS Longitude
+      height: a.float(), // Measurement height
       stationName: a.string(), // Station name
     })
     .identifier(['stationKey', 'timestamp'])
