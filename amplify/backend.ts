@@ -4,7 +4,7 @@ import { data } from './data/resource';
 
 import { graphqlIoTCoreTelemetry } from './functions/graphqlIoTCoreTelemetry/resource';
 import { graphqlIoTCoreStatus } from './functions/graphqlIoTCoreStatus/resource';
-import { smhiWeatherTelemetry } from './functions/smhiWeatherTelemetry';
+import { smhiWeatherTelemetry } from './functions/smhiWeatherTelemetry/resource';
 
 const backend = defineBackend({
   auth,
