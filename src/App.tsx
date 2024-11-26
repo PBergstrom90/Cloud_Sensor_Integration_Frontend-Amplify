@@ -22,6 +22,9 @@ import {
   Legend,
   ChartOptions,
 } from "chart.js";
+import PerfectScrollbar from 'react-perfect-scrollbar';
+import 'react-perfect-scrollbar/dist/css/styles.css';
+
 
 ChartJS.register(
   CategoryScale,
@@ -271,6 +274,7 @@ function App() {
   };
   
   return (
+    <PerfectScrollbar>
     <Box p={6} sx={{ display: "flex", 
     flexDirection: "column", 
     alignItems: "center" }}>
@@ -439,6 +443,7 @@ function App() {
         Sign Out
       </Button>
     </Box>
+    </PerfectScrollbar>
   );
 }
 export default App;
