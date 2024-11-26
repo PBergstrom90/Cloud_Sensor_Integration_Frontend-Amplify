@@ -41,7 +41,6 @@ export const handler: Handler = async (event) => {
             values: {
                 temperature: event.temperature,
                 humidity: event.humidity,
-                owner: deviceData.owner,
             },
         };
         console.log('Telemetry payload for ThingsBoard:', telemetryPayload);
