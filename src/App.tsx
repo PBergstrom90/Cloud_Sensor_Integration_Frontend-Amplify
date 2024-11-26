@@ -46,9 +46,13 @@ function App() {
 
   useEffect(() => {
     client.models.weatherStationData.observeQuery().subscribe({
-      next: (data) => setWeatherStationData([...data.items]),
+      next: (data) => {
+        console.log("Weather Station Data:", data.items);
+        setWeatherStationData([...data.items]);
+      },
     });
   }, []);
+  
 
   useEffect(() => {
     client.models.telemetry.observeQuery().subscribe({
@@ -72,7 +76,8 @@ function App() {
   };
 
   const fetchWeatherData = async () => {
-    const API_GATEWAY_URL = "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m"; // Replace with your API Gateway URL
+    const API_GATEWAY_URL =
+      "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
   
     try {
       const response = await fetch(API_GATEWAY_URL, {
@@ -86,12 +91,19 @@ function App() {
         throw new Error(`Failed to trigger Lambda: ${response.statusText}`);
       }
   
-      const data = await response.json();
-      console.log("Weather Data Lambda Triggered:", data);
-    } catch (error) {
-      console.error("Error triggering weather data fetch:", error);
-    }
-  };
+    // Re-fetch weather station data
+    const weatherStationSubscription = client.models.weatherStationData.observeQuery();
+    weatherStationSubscription.subscribe({
+      next: (snapshot) => {
+        console.log("Updated Weather Station Data:", snapshot.items);
+        setWeatherStationData([...snapshot.items]);
+      },
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+  
 
   const chartData = {
     labels: telemetries.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
@@ -208,8 +220,7 @@ function App() {
 
   const smhiChartData = {
     labels: weatherStationData.map((data) =>
-      moment(data.timestamp).format("HH:mm:ss")
-    ),
+      moment(data?.timestamp).format("HH:mm:ss")),
     datasets: [
       {
         label: "SMHI Temperature",
