@@ -36,6 +36,9 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
     const position = smhiData.position[0];
     const station = smhiData.station;
 
+    // Convert timestamp from milliseconds to seconds
+    const unixTimestamp = Math.floor(latestValue.date / 1000);
+
     console.log("Fetched data from SMHI API:", {
       stationKey: station.key,
       timestamp: latestValue.date,
@@ -47,7 +50,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
       mutation AddWeatherStationData {
         createWeatherStationData(input: {
           stationKey: "${station.key}",
-          timestamp: "${latestValue.date},",
+          timestamp: "${unixTimestamp},",
           temperature: ${latestValue.value},
           quality: "${latestValue.quality}",
           latitude: ${position.latitude},
