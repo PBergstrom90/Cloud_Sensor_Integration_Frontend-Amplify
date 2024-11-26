@@ -60,11 +60,8 @@ export const handler: Handler = async (event, context) => {
             ]
         };
     }
-
-
     return {
         statusCode,
         body: JSON.stringify(responseBody)
     };
-
 };

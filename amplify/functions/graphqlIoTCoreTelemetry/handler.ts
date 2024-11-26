@@ -81,7 +81,6 @@ export const handler: Handler = async (event, context) => {
                 }
                 `})
         });
-
         try {
             response = await fetch(request);
             responseBody = await response.json();
@@ -98,10 +97,8 @@ export const handler: Handler = async (event, context) => {
             };
         }
     }
-
     return {
         statusCode,
         body: JSON.stringify(responseBody)
     };
-
 };
