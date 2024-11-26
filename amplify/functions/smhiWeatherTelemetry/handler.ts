@@ -38,7 +38,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
 
     console.log("Fetched data from SMHI API:", {
       stationKey: station.key,
-      timestamp: new Date(latestValue.date).toISOString(),
+      timestamp: latestValue.date,
       temperature: latestValue.value,
     });
 
@@ -47,7 +47,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
       mutation AddWeatherStationData {
         createWeatherStationData(input: {
           stationKey: "${station.key}",
-          timestamp: "${new Date(latestValue.date).toISOString()}",
+          timestamp: "${latestValue.date},",
           temperature: ${latestValue.value},
           quality: "${latestValue.quality}",
           latitude: ${position.latitude},
