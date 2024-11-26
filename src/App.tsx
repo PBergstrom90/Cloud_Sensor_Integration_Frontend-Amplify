@@ -25,7 +25,6 @@ import {
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import 'react-perfect-scrollbar/dist/css/styles.css';
 
-
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -43,7 +42,6 @@ function App() {
   const [telemetries, setTelemetry] = useState<Array<Schema["telemetry"]["type"]>>([]);
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
   const [weatherStationData, setWeatherStationData] = useState<Array<Schema["weatherStationData"]["type"]>>([]);
-
   const { user, signOut } = useAuthenticator();
 
   useEffect(() => {
@@ -71,6 +69,28 @@ function App() {
 
   const deleteDevice = (device_id: string) => {
     client.models.devices.delete({ device_id });
+  };
+
+  const fetchWeatherData = async () => {
+    const API_GATEWAY_URL = "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m"; // Replace with your API Gateway URL
+  
+    try {
+      const response = await fetch(API_GATEWAY_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to trigger Lambda: ${response.statusText}`);
+      }
+  
+      const data = await response.json();
+      console.log("Weather Data Lambda Triggered:", data);
+    } catch (error) {
+      console.error("Error triggering weather data fetch:", error);
+    }
   };
 
   const chartData = {
@@ -431,6 +451,14 @@ function App() {
     <Line data={smhiChartData} options={smhiChartOptions} />
   </CardContent>
 </Card>
+
+<Button
+  variant="contained"
+  color="primary"
+  onClick={fetchWeatherData}
+>
+  Fetch SMHI Weather Data
+</Button>
 
 
 {/* Sign Out Button */}

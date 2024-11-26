@@ -1,53 +1,98 @@
-import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import type { Handler } from "aws-lambda";
+import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 
 const SMHI_URL =
   "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/97200/period/latest-hour/data.json";
-const dynamoDbClient = new DynamoDBClient({});
-const TABLE_NAME = process.env.API_PROJECT_WEATHERSTATION_TABLENAME; // DynamoDB table name from Amplify
+const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
+const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
-export const handler: Handler = async () => {
+/**
+ * @type {import('@types/aws-lambda').APIGatewayProxyHandler}
+ */
+export const handler: APIGatewayProxyHandlerV2 = async () => {
+  console.log("Starting SMHI Weather Telemetry function...");
+
+  let statusCode = 200;
+  let response;
+  let responseBody;
+
+  const headers = {
+    "Access-Control-Allow-Headers": "x-api-key,Content-Type",
+    "x-api-key": GRAPHQL_API_KEY,
+    "Content-Type": "application/json",
+  };
+
   try {
-    // Fetch data from SMHI API
-    const response = await fetch(SMHI_URL);
+    // Step 1: Fetch SMHI data
+    console.log("Fetching data from SMHI API...");
+    response = await fetch(SMHI_URL);
     if (!response.ok) {
       throw new Error(`Failed to fetch SMHI data: ${response.statusText}`);
     }
-    const data = await response.json();
+    const smhiData = await response.json();
 
     // Extract relevant data
-    const latestValue = data.value[data.value.length - 1]; // Latest observation
-    const position = data.position[0]; // First position (assume it's consistent)
-    const station = data.station;
+    const latestValue = smhiData.value[smhiData.value.length - 1];
+    const position = smhiData.position[0];
+    const station = smhiData.station;
 
-    // Prepare data for DynamoDB
-    const weatherData = {
-      stationKey: { S: station.key }, // Partition key
-      timestamp: { S: new Date(latestValue.date).toISOString() }, // Sort key
-      temperature: { N: latestValue.value },
-      quality: { S: latestValue.quality },
-      latitude: { N: position.latitude.toString() },
-      longitude: { N: position.longitude.toString() },
-      height: { N: position.height.toString() },
-      stationName: { S: station.name },
-    };
-
-    // Save to DynamoDB
-    const putCommand = new PutItemCommand({
-      TableName: TABLE_NAME,
-      Item: weatherData,
+    console.log("Fetched data from SMHI API:", {
+      stationKey: station.key,
+      timestamp: new Date(latestValue.date).toISOString(),
+      temperature: latestValue.value,
     });
-    await dynamoDbClient.send(putCommand);
-    console.log("Weather station data saved successfully:", weatherData);
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: "Weather station data saved successfully" }),
-    };
+
+    // Step 2: Prepare GraphQL mutation
+    const mutation = `
+      mutation AddWeatherStationData {
+        createWeatherStationData(input: {
+          stationKey: "${station.key}",
+          timestamp: "${new Date(latestValue.date).toISOString()}",
+          temperature: ${latestValue.value},
+          quality: "${latestValue.quality}",
+          latitude: ${position.latitude},
+          longitude: ${position.longitude},
+          height: ${position.height},
+          stationName: "${station.name}"
+        }) {
+          stationKey
+          timestamp
+          temperature
+        }
+      }
+    `;
+    console.log("Prepared GraphQL mutation:", mutation);
+
+    // Step 3: Send GraphQL mutation
+    response = await fetch(GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ query: mutation }),
+    });
+
+    responseBody = await response.json();
+    if (responseBody.errors) {
+      statusCode = 400;
+      console.error("GraphQL mutation errors:", responseBody.errors);
+      throw new Error(`GraphQL errors: ${JSON.stringify(responseBody.errors)}`);
+    }
+
+    console.log("Weather station data saved successfully:", responseBody.data);
   } catch (error) {
-    console.error("Error fetching or saving SMHI data:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: (error as any).message }),
+    statusCode = 500;
+    responseBody = {
+      errors: [
+        {
+          message: (error as Error)?.message || "Unknown error",
+          stack: (error as Error)?.stack,
+        },
+      ],
     };
+    console.error("Error in smhiWeatherTelemetry function:", error);
   }
+
+  return {
+    statusCode,
+    body: JSON.stringify(responseBody),
+  };
 };
