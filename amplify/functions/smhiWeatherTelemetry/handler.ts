@@ -50,7 +50,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
       mutation AddWeatherStationData {
         createWeatherStationData(input: {
           stationKey: "${station.key}",
-          timestamp: "${unixTimestamp},",
+          timestamp: ${unixTimestamp},
           temperature: ${latestValue.value},
           quality: "${latestValue.quality}",
           latitude: ${position.latitude},
@@ -93,7 +93,6 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
     };
     console.error("Error in smhiWeatherTelemetry function:", error);
   }
-
   return {
     statusCode,
     body: JSON.stringify(responseBody),
