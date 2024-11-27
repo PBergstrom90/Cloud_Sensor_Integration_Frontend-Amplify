@@ -11,6 +11,12 @@ export const handler: Handler = async (event, context) => {
   let responseBody;
   let request;
 
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "https://main.d3c0g3rqfmqtvl.amplifyapp.com/", 
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+  };
+
   const headers = {
     'x-api-key': GRAPHQL_API_KEY,
     'Content-Type': 'application/json',
@@ -91,7 +97,7 @@ export const handler: Handler = async (event, context) => {
 
   return {
     statusCode,
+    headers: corsHeaders,
     body: JSON.stringify(responseBody),
   };
 };
-
