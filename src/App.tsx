@@ -78,7 +78,6 @@ function App() {
   const fetchWeatherData = async () => {
     const API_GATEWAY_URL =
       "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
-  
     try {
       const response = await fetch(API_GATEWAY_URL, {
         method: "POST",
@@ -86,11 +85,9 @@ function App() {
           "Content-Type": "application/json",
         },
       });
-  
       if (!response.ok) {
         throw new Error(`Failed to trigger Lambda: ${response.statusText}`);
       }
-  
     // Re-fetch weather station data
     const weatherStationSubscription = client.models.weatherStationData.observeQuery();
     weatherStationSubscription.subscribe({
@@ -224,7 +221,7 @@ function App() {
     datasets: [
       {
         label: "SMHI Temperature",
-        data: weatherStationData.map((data) => data.temperature),
+        data: weatherStationData.map((data) => data?.temperature),
         borderColor: "rgba(54, 162, 235, 1)", // Blue
         backgroundColor: "rgba(54, 162, 235, 0.3)", // Light Blue
         fill: true,

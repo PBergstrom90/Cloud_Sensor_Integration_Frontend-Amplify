@@ -12,7 +12,6 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
   let responseBody;
 
   const headers = {
-    "Access-Control-Allow-Headers": "x-api-key,Content-Type",
     "x-api-key": GRAPHQL_API_KEY,
     "Content-Type": "application/json",
   };
@@ -127,6 +126,5 @@ const checkExistingData = async (stationKey: string, timestamp: number) => {
     console.error("Error checking existing data:", data.errors);
     throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
   }
-
   return data.data?.getWeatherStationData || null;
 };
