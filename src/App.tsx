@@ -37,7 +37,6 @@ ChartJS.register(
 
 const client = generateClient<Schema>();
 
-
 function App() {
   const [telemetries, setTelemetry] = useState<Array<Schema["telemetry"]["type"]>>([]);
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
@@ -46,10 +45,7 @@ function App() {
 
   useEffect(() => {
     client.models.weatherStationData.observeQuery().subscribe({
-      next: (data) => {
-        console.log("Weather Station Data:", data.items);
-        setWeatherStationData([...data.items]);
-      },
+      next: (data) => setWeatherStationData([...data.items]),
     });
   }, []);
   
@@ -88,16 +84,9 @@ function App() {
       if (!response.ok) {
         throw new Error(`Failed to trigger Lambda: ${response.statusText}`);
       }
-    // Re-fetch weather station data
-    const weatherStationSubscription = client.models.weatherStationData.observeQuery();
-    weatherStationSubscription.subscribe({
-      next: (snapshot) => {
-        console.log("Updated Weather Station Data:", snapshot.items);
-        setWeatherStationData([...snapshot.items]);
-      },
-    });
+      console.log("Weather data fetch triggered successfully.");
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching weather data:", error);
   }
 }
   
@@ -216,8 +205,7 @@ function App() {
   };
 
   const smhiChartData = {
-    labels: weatherStationData.map((data) =>
-      moment(data?.timestamp).format("HH:mm:ss")),
+    labels: weatherStationData.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
     datasets: [
       {
         label: "SMHI Temperature",

@@ -2,12 +2,7 @@ import {
   type ClientSchema,
   a,
   defineData,
-  defineFunction,
 } from "@aws-amplify/backend";
-
-const echoHandler = defineFunction({
-  entry: './echo-handler/handler.ts'
-})
 
 const schema = a.schema({
   telemetry: a
@@ -20,20 +15,6 @@ const schema = a.schema({
     })
     .identifier(['device_id', 'timestamp'])
     .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
-
-  addTelemetry: a
-    .mutation()
-    .arguments({
-      device_id: a.string().required(),
-      timestamp: a.timestamp().required(),
-      temperature: a.float(),
-      humidity: a.float(),
-      owner: a.string().required()
-    }
-    )
-    .returns(a.ref("telemetry"))
-    .authorization((allow) => [allow.publicApiKey()])
-    .handler(a.handler.function(echoHandler)),
 
   devices: a
     .model({
@@ -56,7 +37,7 @@ const schema = a.schema({
       stationName: a.string(), // Station name
     })
     .identifier(['stationKey', 'timestamp'])
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
