@@ -12,7 +12,7 @@ export const handler: Handler = async (event, context) => {
   let request;
 
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "https://main.d3c0g3rqfmqtvl.amplifyapp.com/", 
+    "Access-Control-Allow-Origin": "*", 
     "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
     "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
   };
