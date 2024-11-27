@@ -11,6 +11,12 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
   let statusCode = 200;
   let responseBody;
 
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "x-api-key,Content-Type",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+  }
+
   const headers = {
     "x-api-key": GRAPHQL_API_KEY,
     "Content-Type": "application/json",
@@ -44,6 +50,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
       console.log("Data already exists for this station and timestamp:", existingData);
       return {
         statusCode: 200,
+        headers: corsHeaders,
         body: JSON.stringify({ message: "Data already exists" }),
       };
     }
@@ -98,6 +105,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
 
   return {
     statusCode,
+    headers: corsHeaders,
     body: JSON.stringify(responseBody),
   };
 };
