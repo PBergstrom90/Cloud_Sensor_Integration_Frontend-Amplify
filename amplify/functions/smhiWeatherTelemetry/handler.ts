@@ -1,87 +1,95 @@
-import type { Handler } from 'aws-lambda';
+import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 
+const SMHI_URL =
+  "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/97200/period/latest-hour/data.json";
 const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
-export const handler: Handler = async (event, context) => {
-  console.log(`EVENT: ${JSON.stringify(event)}`);
+export const handler: APIGatewayProxyHandlerV2 = async () => {
+  console.log("Starting SMHI Weather Telemetry function...");
 
   let statusCode = 200;
-  let response;
   let responseBody;
-  let request;
 
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*", 
-    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "x-api-key,Content-Type",
     "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
-  };
+  }
 
   const headers = {
-    'x-api-key': GRAPHQL_API_KEY,
-    'Content-Type': 'application/json',
+    "x-api-key": GRAPHQL_API_KEY,
+    "Content-Type": "application/json",
   };
 
   try {
-    // Step 1: Get owner information based on stationKey
-    console.log("Fetching owner information...");
-    request = new Request(GRAPHQL_ENDPOINT, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        query: `query GetStationOwner {
-          getWeatherStationData(stationKey: "${event.stationKey}", timestamp: ${event.timestamp}) {
-            stationKey
-            owner
-          }
-        }`,
-      }),
+    // Step 1: Fetch SMHI data
+    console.log("Fetching data from SMHI API...");
+    const smhiResponse = await fetch(SMHI_URL);
+    if (!smhiResponse.ok) {
+      throw new Error(`Failed to fetch SMHI data: ${smhiResponse.statusText}`);
+    }
+    const smhiData = await smhiResponse.json();
+
+    // Extract relevant data
+    const latestValue = smhiData.value[smhiData.value.length - 1];
+    const position = smhiData.position[0];
+    const station = smhiData.station;
+    const unixTimestamp = Math.floor(latestValue.date / 1000);
+
+    console.log("Fetched data from SMHI API:", {
+      stationKey: station.key,
+      timestamp: latestValue.date,
+      temperature: latestValue.value,
     });
 
-    response = await fetch(request);
-    responseBody = await response.json();
-    console.log("Owner fetch response:", responseBody);
-
-    if (!responseBody.data.getWeatherStationData?.owner) {
-      throw new Error("Owner not found for the given stationKey");
+    // Step 2: Check if data already exists
+    console.log("Checking for existing data...");
+    const existingData = await checkExistingData(station.key, unixTimestamp);
+    if (existingData) {
+      console.log("Data already exists for this station and timestamp:", existingData);
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: "Data already exists" }),
+      };
     }
 
-    const owner = responseBody.data.getWeatherStationData.owner;
+    // Step 3: Prepare GraphQL mutation
+    const mutation = `
+      mutation AddWeatherStationData {
+        createWeatherStationData(input: {
+          stationKey: "${station.key}",
+          timestamp: ${unixTimestamp},
+          temperature: ${latestValue.value},
+          quality: "${latestValue.quality}",
+          latitude: ${position.latitude},
+          longitude: ${position.longitude},
+          height: ${position.height},
+          stationName: "${station.name}"
+        }) {
+          stationKey
+          timestamp
+          temperature
+        }
+      }
+    `;
+    console.log("Prepared GraphQL mutation:", mutation);
 
-    // Step 2: Mutate to create new weatherStationData
-    console.log("Creating new weatherStationData...");
-    request = new Request(GRAPHQL_ENDPOINT, {
-      method: 'POST',
+    // Step 4: Send GraphQL mutation
+    const graphqlResponse = await fetch(GRAPHQL_ENDPOINT, {
+      method: "POST",
       headers,
-      body: JSON.stringify({
-        query: `mutation CreateWeatherStationData {
-          createWeatherStationData(input: {
-            stationKey: "${event.stationKey}",
-            timestamp: ${event.timestamp},
-            temperature: ${event.temperature},
-            quality: "${event.quality}",
-            latitude: ${event.latitude},
-            longitude: ${event.longitude},
-            height: ${event.height},
-            stationName: "${event.stationName}",
-            owner: "${owner}"
-          }) {
-            stationKey
-            timestamp
-            temperature
-            owner
-          }
-        }`,
-      }),
+      body: JSON.stringify({ query: mutation }),
     });
 
-    response = await fetch(request);
-    responseBody = await response.json();
-    console.log("Mutation response:", responseBody);
-
-    if (responseBody.errors) {
-      throw new Error(`Mutation errors: ${JSON.stringify(responseBody.errors)}`);
+    const graphqlData = await graphqlResponse.json();
+    if (graphqlData.errors) {
+      throw new Error(`GraphQL errors: ${JSON.stringify(graphqlData.errors)}`);
     }
+
+    console.log("Weather station data saved successfully:", graphqlData.data);
+    responseBody = graphqlData.data;
   } catch (error) {
     statusCode = 500;
     responseBody = {
@@ -92,7 +100,7 @@ export const handler: Handler = async (event, context) => {
         },
       ],
     };
-    console.error("Error in handler:", error);
+    console.error("Error in smhiWeatherTelemetry function:", error);
   }
 
   return {
@@ -100,4 +108,31 @@ export const handler: Handler = async (event, context) => {
     headers: corsHeaders,
     body: JSON.stringify(responseBody),
   };
+};
+
+const checkExistingData = async (stationKey: string, timestamp: number) => {
+  const query = `
+    query CheckWeatherData {
+      getWeatherStationData(stationKey: "${stationKey}", timestamp: ${timestamp}) {
+        stationKey
+        timestamp
+      }
+    }
+  `;
+
+  const response = await fetch(GRAPHQL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "x-api-key": GRAPHQL_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query }),
+  });
+
+  const data = await response.json();
+  if (data.errors) {
+    console.error("Error checking existing data:", data.errors);
+    throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+  }
+  return data.data?.getWeatherStationData || null;
 };
