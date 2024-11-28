@@ -26,7 +26,7 @@ export const handler: Handler = async (event, context) => {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
-            query: `query MyQuery {
+            query: `query deviceQuery {
                         getDevices(device_id: "${event.device_id}") {
                             device_id
                             owner

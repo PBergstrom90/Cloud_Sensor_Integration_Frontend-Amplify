@@ -1,15 +1,17 @@
-import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
+import { Handler } from "aws-lambda";
 
 const SMHI_URL =
   "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/97200/period/latest-hour/data.json";
 const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
-export const handler: APIGatewayProxyHandlerV2 = async () => {
+export const handler: Handler = async (event) => {
   console.log("Starting SMHI Weather Telemetry function...");
 
   let statusCode = 200;
   let responseBody;
+  let response;
+  let request;
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -21,6 +23,38 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
     "x-api-key": GRAPHQL_API_KEY,
     "Content-Type": "application/json",
   };
+
+      // Get sessionowner of the weather station
+      request = new Request(GRAPHQL_ENDPOINT, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+            query: `query stationQuery {
+                        getStation(stationKey: "${event.stationKey}") {
+                            stationKey
+                            owner
+                        }
+                        }
+                `})
+    });
+    console.log("request:", request)
+
+    try {
+        response = await fetch(request);
+        responseBody = await response.json();
+        console.log("responseBody:", responseBody)
+        if (responseBody.errors) statusCode = 400;
+    } catch (error) {
+        statusCode = 400;
+        responseBody = {
+            errors: [
+                {
+                    status: response?.status,
+                    error: JSON.stringify(error),
+                }
+            ]
+        };
+    }
 
   try {
     // Step 1: Fetch SMHI data
@@ -36,6 +70,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
     const position = smhiData.position[0];
     const station = smhiData.station;
     const unixTimestamp = Math.floor(latestValue.date / 1000);
+    const owner = responseBody.data.getStation.owner;
 
     console.log("Fetched data from SMHI API:", {
       stationKey: station.key,
@@ -67,6 +102,7 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
           longitude: ${position.longitude},
           height: ${position.height},
           stationName: "${station.name}"
+          owner: "${owner}"
         }) {
           stationKey
           timestamp

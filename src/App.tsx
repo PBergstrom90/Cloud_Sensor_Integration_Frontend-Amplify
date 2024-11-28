@@ -67,9 +67,20 @@ function App() {
     }
   };
 
+  const createStation = () => {
+    const stationKey = String(window.prompt("Station Key"));
+    if (stationKey) {
+      client.models.weatherStationData.create({ stationKey: stationKey, owner: user.userId });  
+    }
+  };
+
   const deleteDevice = (device_id: string) => {
     client.models.devices.delete({ device_id });
   };
+
+  /*const deleteStation = (stationKey: string) => {
+    client.models.weatherStationData.delete({ stationKey });
+  };*/
 
   const fetchWeatherData = async () => {
     const API_GATEWAY_URL =
@@ -450,6 +461,10 @@ function App() {
     <Line data={smhiChartData} options={smhiChartOptions} />
   </CardContent>
 </Card>
+
+<Button onClick={createStation} variant="contained" color="primary">
+  Create Weather Station
+</Button>
 
 <Button
   variant="contained"
