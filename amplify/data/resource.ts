@@ -35,6 +35,7 @@ const schema = a.schema({
       longitude: a.float(), // GPS Longitude
       height: a.float(), // Measurement height
       stationName: a.string(), // Station name
+      owner: a.string().required(), // Owner of the data
     })
     .identifier(['stationKey', 'timestamp'])
     .authorization((allow) => [allow.owner(), allow.publicApiKey()]),

@@ -5,15 +5,17 @@ const SMHI_URL =
 const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
-export const handler: APIGatewayProxyHandlerV2 = async () => {
+export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   console.log("Starting SMHI Weather Telemetry function...");
 
   let statusCode = 200;
   let responseBody;
+  let response;
+  let request;
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "x-api-key,Content-Type",
+    "Access-Control-Allow-Headers": "x-api-key,Content-Type,Authorization",
     "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
   }
 
@@ -21,6 +23,8 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
     "x-api-key": GRAPHQL_API_KEY,
     "Content-Type": "application/json",
   };
+
+  /** @type {import('node-fetch').RequestInit} */
 
   try {
     // Step 1: Fetch SMHI data
@@ -55,8 +59,26 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
       };
     }
 
-    // Step 3: Prepare GraphQL mutation
-    const mutation = `
+  // Step 3: Retrieve Access Token and User Info
+  console.log("Retrieving user information...");
+  const claims = (event.requestContext as any)?.authorizer?.claims;
+  if (!claims) {
+    console.error("No authenticated user found in the request context.");
+    return {
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "Unauthorized: No user information found." }),
+    };
+  }
+
+  const owner = claims.sub;
+
+    // Step 4: Send GraphQL mutation
+    console.log("Sending GraphQL mutation to save weather station data...");
+    request = new Request(GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({ query: `
       mutation AddWeatherStationData {
         createWeatherStationData(input: {
           stationKey: "${station.key}",
@@ -66,48 +88,45 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
           latitude: ${position.latitude},
           longitude: ${position.longitude},
           height: ${position.height},
-          stationName: "${station.name}"
+          stationName: "${station.name},
+          owner: "${owner}"
         }) {
           stationKey
           timestamp
           temperature
         }
       }
-    `;
-    console.log("Prepared GraphQL mutation:", mutation);
-
-    // Step 4: Send GraphQL mutation
-    const graphqlResponse = await fetch(GRAPHQL_ENDPOINT, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ query: mutation }),
+    ` }),
     });
-
-    const graphqlData = await graphqlResponse.json();
-    if (graphqlData.errors) {
-      throw new Error(`GraphQL errors: ${JSON.stringify(graphqlData.errors)}`);
-    }
-
-    console.log("Weather station data saved successfully:", graphqlData.data);
-    responseBody = graphqlData.data;
+    try {
+      response = await fetch(request);
+      responseBody = await response.json();
+      console.log("Weather station data saved successfully:", responseBody);
+      if (responseBody.errors) statusCode = 400;
   } catch (error) {
-    statusCode = 500;
-    responseBody = {
-      errors: [
-        {
-          message: (error as Error)?.message || "Unknown error",
-          stack: (error as Error)?.stack,
-        },
-      ],
-    };
-    console.error("Error in smhiWeatherTelemetry function:", error);
+      statusCode = 400;
+      responseBody = {
+          errors: [
+              {
+                  status: response?.status,
+                  error: JSON.stringify(error),
+              }
+          ]
+      }
   }
-
   return {
     statusCode,
     headers: corsHeaders,
     body: JSON.stringify(responseBody),
   };
+  } catch (error) {
+    console.error("Error fetching data:", error);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "Internal server error" }),
+    };
+  }
 };
 
 const checkExistingData = async (stationKey: string, timestamp: number) => {

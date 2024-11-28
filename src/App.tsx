@@ -90,7 +90,6 @@ function App() {
   }
 }
   
-
   const chartData = {
     labels: telemetries.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
     datasets: [
