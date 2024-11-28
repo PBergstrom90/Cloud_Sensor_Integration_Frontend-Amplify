@@ -25,19 +25,27 @@ const schema = a.schema({
     .identifier(['device_id'])
     .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
 
-    weatherStationData: a
+    weatherStation: a
+      .model({
+        stationKey: a.string().required(), // Partition key
+        owner: a.string().required(), // Session owner
+      })
+      .identifier(['stationKey'])
+      .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
+
+    weatherData: a
     .model({
       stationKey: a.string().required(), // Partition key
-      owner: a.string().required(), // Session owner
-      timestamp: a.timestamp(), // Sort key
+      timestamp: a.timestamp().required(), // Sort key
       temperature: a.float(), // Temperature value
       quality: a.string(), // Quality of data (e.g., "G")
       latitude: a.float(), // GPS Latitude
       longitude: a.float(), // GPS Longitude
       height: a.float(), // Measurement height
       stationName: a.string(), // Station name
+      owner: a.string().required(), // Session owner
     })
-    .identifier(['stationKey'])
+    .identifier(['stationKey', 'timestamp'])
     .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
 });
 

@@ -30,11 +30,11 @@ export const handler: Handler = async (event) => {
         headers: headers,
         body: JSON.stringify({
             query: `query stationQuery {
-                        getStation(stationKey: "${event.stationKey}") {
-                            stationKey
-                            owner
-                        }
-                        }
+                    getWeatherStation(stationKey: "${event.stationKey}") {
+                    stationKey
+                    owner
+                    }
+                  }
                 `})
     });
     console.log("request:", request)
@@ -44,7 +44,14 @@ export const handler: Handler = async (event) => {
         responseBody = await response.json();
         console.log("responseBody:", responseBody)
         if (responseBody.errors) statusCode = 400;
-    } catch (error) {
+        if (!responseBody.data.getWeatherStation) {
+          return {
+            statusCode: 404,
+            headers: corsHeaders,
+            body: JSON.stringify({ message: "Weather station not found" }),
+          };
+        }  
+        } catch (error) {
         statusCode = 400;
         responseBody = {
             errors: [
@@ -92,8 +99,8 @@ export const handler: Handler = async (event) => {
 
     // Step 3: Prepare GraphQL mutation
     const mutation = `
-      mutation AddWeatherStationData {
-        createWeatherStationData(input: {
+      mutation AddWeatherData {
+        createWeatherData(input: {
           stationKey: "${station.key}",
           timestamp: ${unixTimestamp},
           temperature: ${latestValue.value},

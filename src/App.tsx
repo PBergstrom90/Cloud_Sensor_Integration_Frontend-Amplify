@@ -40,12 +40,12 @@ const client = generateClient<Schema>();
 function App() {
   const [telemetries, setTelemetry] = useState<Array<Schema["telemetry"]["type"]>>([]);
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
-  const [weatherStationData, setWeatherStationData] = useState<Array<Schema["weatherStationData"]["type"]>>([]);
+  const [weatherData, setWeatherData] = useState<Array<Schema["weatherData"]["type"]>>([]);
   const { user, signOut } = useAuthenticator();
 
   useEffect(() => {
-    client.models.weatherStationData.observeQuery().subscribe({
-      next: (data) => setWeatherStationData([...data.items]),
+    client.models.weatherData.observeQuery().subscribe({
+      next: (data) => setWeatherData([...data.items]),
     });
   }, []);
   
@@ -70,7 +70,7 @@ function App() {
   const createStation = () => {
     const stationKey = String(window.prompt("Station Key"));
     if (stationKey) {
-      client.models.weatherStationData.create({ stationKey: stationKey, owner: user.userId });  
+      client.models.weatherStation.create({ stationKey: stationKey, owner: user.userId });  
     }
   };
 
@@ -79,7 +79,7 @@ function App() {
   };
 
   /*const deleteStation = (stationKey: string) => {
-    client.models.weatherStationData.delete({ stationKey });
+    client.models.weatherStation.delete({ stationKey });
   };*/
 
   const fetchWeatherData = async () => {
@@ -97,9 +97,9 @@ function App() {
       }
       console.log("Weather data fetch triggered successfully.");
       // Refresh the weatherStationData state
-    const updatedData = await client.models.weatherStationData.list(); // Fetch updated data from AppSync
+    const updatedData = await client.models.weatherData.list(); // Fetch updated data from AppSync
     console.log(updatedData);
-    setWeatherStationData(updatedData.data);
+    setWeatherData(updatedData.data);
   } catch (error) {
     console.error("Error fetching weather data:", error);
   }
@@ -219,11 +219,11 @@ function App() {
   };
 
   const smhiChartData = {
-    labels: weatherStationData.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
+    labels: weatherData.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
     datasets: [
       {
         label: "SMHI Temperature",
-        data: weatherStationData.map((data) => data?.temperature),
+        data: weatherData.map((data) => data?.temperature),
         borderColor: "rgba(54, 162, 235, 1)", // Blue
         backgroundColor: "rgba(54, 162, 235, 0.3)", // Light Blue
         fill: true,
@@ -455,8 +455,8 @@ function App() {
 >
   <CardContent>
   <Typography variant="subtitle1" textAlign="center">
-    Station: {weatherStationData[0]?.stationName || "N/A"} <br />
-    Location: {weatherStationData[0]?.latitude}, {weatherStationData[0]?.longitude}
+    Station: {weatherData[0]?.stationName || "N/A"} <br />
+    Location: {weatherData[0]?.latitude}, {weatherData[0]?.longitude}
   </Typography>
     <Line data={smhiChartData} options={smhiChartOptions} />
   </CardContent>
