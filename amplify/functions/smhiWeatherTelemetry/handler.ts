@@ -5,7 +5,7 @@ const SMHI_URL =
 const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
-export const handler: Handler = async (event) => {
+export const handler: Handler = async (event, context) => {
   console.log(`EVENT: ${JSON.stringify(event)}`);
 
   let statusCode = 200;
@@ -23,6 +23,13 @@ export const handler: Handler = async (event) => {
     "x-api-key": GRAPHQL_API_KEY,
     "Content-Type": "application/json",
   };
+
+  // Parse stationKey from the frontend payload
+  const { stationKey } = JSON.parse(event.body || "{}");
+  if (!stationKey) {
+    throw new Error("'stationKey' is missing in the request payload.");
+  }
+  console.log(`Received stationKey: ${stationKey}`);
 
   try {
     // Step 1: Fetch SMHI data
