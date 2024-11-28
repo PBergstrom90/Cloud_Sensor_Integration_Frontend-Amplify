@@ -5,42 +5,40 @@ const SMHI_URL =
 const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
-export const handler: Handler = async (event, context) => {
+export const handler: Handler = async (event) => {
   console.log(`EVENT: ${JSON.stringify(event)}`);
-
-  let statusCode = 200;
-  let responseBody;
-  let response;
-  let request;
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "x-api-key,Content-Type",
     "Access-Control-Allow-Methods": "OPTIONS, POST",
-  }
+  };
 
   // Handle CORS preflight request
-    if (event.httpMethod === "OPTIONS") {
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ message: "CORS preflight response" }),
-      };
-    }
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "CORS preflight response" }),
+    };
+  }
 
   const headers = {
     "x-api-key": GRAPHQL_API_KEY,
     "Content-Type": "application/json",
   };
 
-  // Parse stationKey from the frontend payload
-  const { stationKey } = JSON.parse(event.body || "{}");
-  if (!stationKey) {
-    throw new Error("'stationKey' is missing in the request payload.");
-  }
-  console.log(`Received stationKey: ${stationKey}`);
+  let statusCode = 200;
+  let responseBody;
 
   try {
+    // Parse stationKey from the payload
+    const { stationKey } = JSON.parse(event.body || "{}");
+    if (!stationKey) {
+      throw new Error("'stationKey' is missing in the request payload.");
+    }
+    console.log(`Received stationKey: ${stationKey}`);
+
     // Step 1: Fetch SMHI data
     console.log("Fetching data from SMHI API...");
     const smhiResponse = await fetch(SMHI_URL);
@@ -48,22 +46,19 @@ export const handler: Handler = async (event, context) => {
       throw new Error(`Failed to fetch SMHI data: ${smhiResponse.statusText}`);
     }
     const smhiData = await smhiResponse.json();
-
-    // Extract relevant data
     const latestValue = smhiData.value[smhiData.value.length - 1];
     const position = smhiData.position[0];
-    const station = smhiData.station;
     const unixTimestamp = Math.floor(latestValue.date / 1000);
 
     console.log("Fetched data from SMHI API:", {
-      stationKey: station.key,
-      timestamp: latestValue.date,
+      stationKey: stationKey,
+      timestamp: unixTimestamp,
       temperature: latestValue.value,
     });
 
     // Step 2: Check if data already exists
     console.log("Checking for existing data...");
-    const existingData = await checkExistingData(station.key, unixTimestamp);
+    const existingData = await checkExistingData(stationKey, unixTimestamp);
     if (existingData) {
       console.log("Data already exists for this station and timestamp:", existingData);
       return {
@@ -73,59 +68,42 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
-          // Get sessionowner of the weather station
-          request = new Request(GRAPHQL_ENDPOINT, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({
-                query: `query stationQuery {
-                        getWeatherStation(stationKey: "${event.stationKey}") {
-                        stationKey
-                        owner
-                        }
-                      }
-                    `})
-        });
-        console.log("request:", request)
-    
-        try {
-            response = await fetch(request);
-            responseBody = await response.json();
-            console.log("responseBody:", responseBody)
-            if (responseBody.errors) statusCode = 400;
-            if (!responseBody.data.getWeatherStation) {
-              return {
-                statusCode: 404,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: "Weather station not found" }),
-              };
-            }  
-            } catch (error) {
-            statusCode = 400;
-            responseBody = {
-                errors: [
-                    {
-                        status: response?.status,
-                        error: JSON.stringify(error),
-                    }
-                ]
-            };
+    // Step 3: Get owner of the weather station
+    console.log("Fetching weather station owner...");
+    const stationQuery = `
+      query stationQuery {
+        getWeatherStation(stationKey: "${stationKey}") {
+          stationKey
+          owner
         }
+      }
+    `;
+    const stationResponse = await fetch(GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ query: stationQuery }),
+    });
 
-    const owner = responseBody.data.getStation.owner;
+    const stationResponseBody = await stationResponse.json();
+    if (stationResponseBody.errors || !stationResponseBody.data?.getWeatherStation) {
+      throw new Error("Weather station not found or query failed.");
+    }
+    const owner = stationResponseBody.data.getWeatherStation.owner;
+    console.log(`Found weather station owner: ${owner}`);
 
-    // Step 3: Prepare GraphQL mutation
+    // Step 4: Add new weather data
+    console.log("Preparing GraphQL mutation to add weather data...");
     const mutation = `
       mutation AddWeatherData {
         createWeatherData(input: {
-          stationKey: "${station.key}",
+          stationKey: "${stationKey}",
           timestamp: ${unixTimestamp},
           temperature: ${latestValue.value},
           quality: "${latestValue.quality}",
           latitude: ${position.latitude},
           longitude: ${position.longitude},
           height: ${position.height},
-          stationName: "${station.name}"
+          stationName: "${smhiData.station.name}",
           owner: "${owner}"
         }) {
           stationKey
@@ -134,9 +112,7 @@ export const handler: Handler = async (event, context) => {
         }
       }
     `;
-    console.log("Prepared GraphQL mutation:", mutation);
 
-    // Step 4: Send GraphQL mutation
     const graphqlResponse = await fetch(GRAPHQL_ENDPOINT, {
       method: "POST",
       headers,
@@ -145,22 +121,19 @@ export const handler: Handler = async (event, context) => {
 
     const graphqlData = await graphqlResponse.json();
     if (graphqlData.errors) {
-      throw new Error(`GraphQL errors: ${JSON.stringify(graphqlData.errors)}`);
+      throw new Error(`GraphQL mutation failed: ${JSON.stringify(graphqlData.errors)}`);
     }
 
     console.log("Weather station data saved successfully:", graphqlData.data);
     responseBody = graphqlData.data;
   } catch (error) {
+    console.error("Error in Lambda function:", error);
     statusCode = 500;
-    responseBody = {
-      errors: [
-        {
-          message: (error as Error)?.message || "Unknown error",
-          stack: (error as Error)?.stack,
-        },
-      ],
-    };
-    console.error("Error in smhiWeatherTelemetry function:", error);
+    if (error instanceof Error) {
+      responseBody = { errors: [{ message: error.message, stack: error.stack }] };
+    } else {
+      responseBody = { errors: [{ message: String(error) }] };
+    }
   }
 
   return {
@@ -192,7 +165,8 @@ const checkExistingData = async (stationKey: string, timestamp: number) => {
   const data = await response.json();
   if (data.errors) {
     console.error("Error checking existing data:", data.errors);
-    throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+    throw new Error(`GraphQL query failed: ${JSON.stringify(data.errors)}`);
   }
+
   return data.data?.getWeatherData || null;
 };
