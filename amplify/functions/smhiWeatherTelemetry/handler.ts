@@ -6,7 +6,7 @@ const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
 export const handler: Handler = async (event) => {
-  console.log("Starting SMHI Weather Telemetry function...");
+  console.log(`EVENT: ${JSON.stringify(event)}`);
 
   let statusCode = 200;
   let responseBody;
@@ -24,45 +24,6 @@ export const handler: Handler = async (event) => {
     "Content-Type": "application/json",
   };
 
-      // Get sessionowner of the weather station
-      request = new Request(GRAPHQL_ENDPOINT, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-            query: `query stationQuery {
-                    getWeatherStation(stationKey: "${event.stationKey}") {
-                    stationKey
-                    owner
-                    }
-                  }
-                `})
-    });
-    console.log("request:", request)
-
-    try {
-        response = await fetch(request);
-        responseBody = await response.json();
-        console.log("responseBody:", responseBody)
-        if (responseBody.errors) statusCode = 400;
-        if (!responseBody.data.getWeatherStation) {
-          return {
-            statusCode: 404,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: "Weather station not found" }),
-          };
-        }  
-        } catch (error) {
-        statusCode = 400;
-        responseBody = {
-            errors: [
-                {
-                    status: response?.status,
-                    error: JSON.stringify(error),
-                }
-            ]
-        };
-    }
-
   try {
     // Step 1: Fetch SMHI data
     console.log("Fetching data from SMHI API...");
@@ -77,7 +38,6 @@ export const handler: Handler = async (event) => {
     const position = smhiData.position[0];
     const station = smhiData.station;
     const unixTimestamp = Math.floor(latestValue.date / 1000);
-    const owner = responseBody.data.getStation.owner;
 
     console.log("Fetched data from SMHI API:", {
       stationKey: station.key,
@@ -96,6 +56,47 @@ export const handler: Handler = async (event) => {
         body: JSON.stringify({ message: "Data already exists" }),
       };
     }
+
+          // Get sessionowner of the weather station
+          request = new Request(GRAPHQL_ENDPOINT, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                query: `query stationQuery {
+                        getWeatherStation(stationKey: "${event.stationKey}") {
+                        stationKey
+                        owner
+                        }
+                      }
+                    `})
+        });
+        console.log("request:", request)
+    
+        try {
+            response = await fetch(request);
+            responseBody = await response.json();
+            console.log("responseBody:", responseBody)
+            if (responseBody.errors) statusCode = 400;
+            if (!responseBody.data.getWeatherStation) {
+              return {
+                statusCode: 404,
+                headers: corsHeaders,
+                body: JSON.stringify({ message: "Weather station not found" }),
+              };
+            }  
+            } catch (error) {
+            statusCode = 400;
+            responseBody = {
+                errors: [
+                    {
+                        status: response?.status,
+                        error: JSON.stringify(error),
+                    }
+                ]
+            };
+        }
+
+    const owner = responseBody.data.getStation.owner;
 
     // Step 3: Prepare GraphQL mutation
     const mutation = `

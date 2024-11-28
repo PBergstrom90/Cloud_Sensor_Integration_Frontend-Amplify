@@ -42,6 +42,7 @@ function App() {
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
   const [weatherData, setWeatherData] = useState<Array<Schema["weatherData"]["type"]>>([]);
   const { user, signOut } = useAuthenticator();
+  const [stationKey, setStationKey] = useState<string | null>(null);
 
   useEffect(() => {
     client.models.weatherData.observeQuery().subscribe({
@@ -70,7 +71,14 @@ function App() {
   const createStation = () => {
     const stationKey = String(window.prompt("Station Key"));
     if (stationKey) {
-      client.models.weatherStation.create({ stationKey: stationKey, owner: user.userId });  
+      client.models.weatherStation.create({ stationKey: stationKey, owner: user.userId })
+      .then(() => {
+        console.log("Weather station created successfully.");
+        setStationKey(stationKey);  
+    })
+    .catch((error) => {
+      console.error("Error creating weather station:", error);
+    });
     }
   };
 
@@ -86,20 +94,20 @@ function App() {
     const API_GATEWAY_URL =
       "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
     try {
+      if (!stationKey) {
+        throw new Error("Station Key is not set. Please create a station first.");
+      }
+      const payload = {stationKey};
       const response = await fetch(API_GATEWAY_URL, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-        },
-      });
+          "Content-Type": "application/json"},
+          body: JSON.stringify(payload),
+        });
       if (!response.ok) {
         throw new Error(`Failed to trigger Lambda: ${response.statusText}`);
       }
       console.log("Weather data fetch triggered successfully.");
-      // Refresh the weatherStationData state
-    const updatedData = await client.models.weatherData.list(); // Fetch updated data from AppSync
-    console.log(updatedData);
-    setWeatherData(updatedData.data);
   } catch (error) {
     console.error("Error fetching weather data:", error);
   }
