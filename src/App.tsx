@@ -73,7 +73,7 @@ function App() {
 
   const fetchWeatherData = async () => {
     const API_GATEWAY_URL =
-      "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/FirstDeploy/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
+      "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
     try {
       const response = await fetch(API_GATEWAY_URL, {
         method: "POST",
