@@ -157,7 +157,7 @@ export const handler: Handler = async (event) => {
 const checkExistingData = async (stationKey: string, timestamp: number) => {
   const query = `
     query CheckWeatherData {
-      getWeatherStationData(stationKey: "${stationKey}", timestamp: ${timestamp}) {
+      getWeatherData(stationKey: "${stationKey}", timestamp: ${timestamp}) {
         stationKey
         timestamp
       }
@@ -178,5 +178,5 @@ const checkExistingData = async (stationKey: string, timestamp: number) => {
     console.error("Error checking existing data:", data.errors);
     throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
   }
-  return data.data?.getWeatherStationData || null;
+  return data.data?.getWeatherData || null;
 };
