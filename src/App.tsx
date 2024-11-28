@@ -227,7 +227,7 @@ function App() {
   };
 
   const smhiChartData = {
-    labels: weatherData.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
+    labels: weatherData.map((data) => moment.unix(data?.timestamp).format("HH:mm:ss")),
     datasets: [
       {
         label: "SMHI Temperature",
@@ -464,7 +464,7 @@ function App() {
   <CardContent>
   <Typography variant="subtitle1" textAlign="center">
     Station: {weatherData[0]?.stationName || "N/A"} <br />
-    Location: {weatherData[0]?.latitude}, {weatherData[0]?.longitude}
+    Location 'latitude': {weatherData[0]?.latitude}, 'longitude': {weatherData[0]?.longitude}
   </Typography>
     <Line data={smhiChartData} options={smhiChartOptions} />
   </CardContent>
