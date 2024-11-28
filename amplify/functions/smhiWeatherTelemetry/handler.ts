@@ -16,8 +16,17 @@ export const handler: Handler = async (event, context) => {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "x-api-key,Content-Type",
-    "Access-Control-Allow-Methods": "*",
+    "Access-Control-Allow-Methods": "OPTIONS, POST",
   }
+
+  // Handle CORS preflight request
+    if (event.httpMethod === "OPTIONS") {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: "CORS preflight response" }),
+      };
+    }
 
   const headers = {
     "x-api-key": GRAPHQL_API_KEY,
