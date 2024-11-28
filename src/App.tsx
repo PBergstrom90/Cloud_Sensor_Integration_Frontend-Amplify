@@ -24,6 +24,9 @@ import {
 } from "chart.js";
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import 'react-perfect-scrollbar/dist/css/styles.css';
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 ChartJS.register(
   CategoryScale,
@@ -34,6 +37,14 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+
+// Custom Leaflet Marker Icon to fix missing icon issue
+const customIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
 
 const client = generateClient<Schema>();
 
@@ -312,10 +323,12 @@ function App() {
   };
   
   return (
-    <PerfectScrollbar>
-    <Box p={6} sx={{ display: "flex", 
-    flexDirection: "column", 
-    alignItems: "center" }}>
+    <Box p={6} sx={{ 
+      display: "flex", 
+      flexDirection: "column", 
+      flexShrink: 0,
+      alignItems: "center" 
+      }}>
       {/* Overview Section */}
       <Card sx={{ 
         mb: 3, 
@@ -363,10 +376,13 @@ function App() {
 </Card>
 
 {/* Devices Section */}
+<PerfectScrollbar>
 <Box sx={{ 
   mb: 3, 
   width: "100%",
-  maxWidth: "1000px", 
+  maxWidth: "900px", 
+  flexGrow: 1,
+  overflow: "hidden",
   margin: "0auto" }}>
   <Typography variant="h4" gutterBottom textAlign="left">
     Devices
@@ -439,7 +455,7 @@ function App() {
 {/* Telemetry Chart Section */}
 <Card sx={{ 
   mb: 3, 
-  width: "110%", 
+  width: "100%", 
   maxWidth: "1100px", 
   backgroundColor: "#1a1a2e", 
   color: "#fff" }}>
@@ -452,48 +468,101 @@ function App() {
 </Card>
 
 {/* SMHI Weather Data Chart Section */}
-<Card
-  sx={{
-    mb: 3,
-    width: "110%",
-    maxWidth: "1100px",
-    backgroundColor: "#1a1a2e",
-    color: "#fff",
-  }}
->
-  <CardContent>
-  <Typography variant="subtitle1" textAlign="center">
-    Station: {weatherData[0]?.stationName || "N/A"} <br />
-    Location 'latitude': {weatherData[0]?.latitude}, 'longitude': {weatherData[0]?.longitude}
-  </Typography>
-    <Line data={smhiChartData} options={smhiChartOptions} />
-  </CardContent>
-</Card>
+        <Card
+          sx={{
+            mb: 3,
+            width: "100%",
+            maxWidth: "1100px",
+            backgroundColor: "#1a1a2e",
+            color: "#fff",
+          }}
+        >
+          <CardContent>
+            <Typography variant="subtitle1" textAlign="center">
+              Station: {weatherData[0]?.stationName || "N/A"} <br />
+              Location 'latitude': {weatherData[0]?.latitude}, 'longitude':{" "}
+              {weatherData[0]?.longitude}
+            </Typography>
+            <Line data={smhiChartData} options={smhiChartOptions} />
+          </CardContent>
+        </Card>
+
+        {/* Map Section */}
+        <Box
+          sx={{
+            mt: 3,
+            mb: 3,
+            width: "100%",
+            maxWidth: "1100px",
+            borderRadius: "8px",
+            background: "#1a1a2e",
+          }}
+        >
+          <Typography
+            variant="h5"
+            sx={{
+              textAlign: "center",
+              padding: "10px",
+              color: "#fff",
+            }}
+          >
+            Weather Station Map
+          </Typography>
+          <MapContainer
+            center={[
+              weatherData[0]?.latitude || 59.3293,
+              weatherData[0]?.longitude || 18.0686,
+            ]}
+            zoom={10}
+            style={{ height: "400px", width: "100%" }}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            />
+            {weatherData.length > 0 && (
+              <Marker
+                position={[
+                  weatherData[0]?.latitude ?? 0,
+                  weatherData[0]?.longitude ?? 0,
+                ]}
+                icon={customIcon}
+              >
+                <Popup>
+                  <strong>Station:</strong> {weatherData[0]?.stationName || "N/A"}{" "}
+                  <br />
+                  <strong>Temperature:</strong>{" "}
+                  {weatherData[0]?.temperature || "N/A"}°C
+                </Popup>
+              </Marker>
+  )}
+  </MapContainer>
+</Box>
+</PerfectScrollbar>
 
 <Button onClick={createStation} variant="contained" color="primary">
-  Create Weather Station
+Create Weather Station
 </Button>
 
 <Button
-  variant="contained"
-  color="primary"
-  onClick={fetchWeatherData}
+variant="contained"
+color="primary"
+onClick={fetchWeatherData}
 >
-  Fetch SMHI Weather Data
+Fetch SMHI Weather Data
 </Button>
 
 
 {/* Sign Out Button */}
 <Button variant="contained" color="secondary" 
-  sx={{ 
-    width: "100%", 
-    maxWidth: "200px", 
-    textAlign: "center" }} 
-  onClick={signOut}>
-        Sign Out
-      </Button>
-    </Box>
-    </PerfectScrollbar>
-  );
+sx={{ 
+  width: "100%", 
+  maxWidth: "200px", 
+  textAlign: "center" }} 
+onClick={signOut}>
+      Sign Out
+    </Button>
+  </Box>
+);
 }
 export default App;
