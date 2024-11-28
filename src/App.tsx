@@ -85,6 +85,10 @@ function App() {
         throw new Error(`Failed to trigger Lambda: ${response.statusText}`);
       }
       console.log("Weather data fetch triggered successfully.");
+      // Refresh the weatherStationData state
+    const updatedData = await client.models.weatherStationData.list(); // Fetch updated data from AppSync
+    console.log(updatedData);
+    setWeatherStationData(updatedData.data);
   } catch (error) {
     console.error("Error fetching weather data:", error);
   }
