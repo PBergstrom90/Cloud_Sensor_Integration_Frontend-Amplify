@@ -6,6 +6,9 @@ import {
   Typography,
   Button,
   Box,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { Line } from "react-chartjs-2";
 import moment from "moment";
@@ -22,11 +25,11 @@ import {
   Legend,
   ChartOptions,
 } from "chart.js";
-import PerfectScrollbar from 'react-perfect-scrollbar';
 import 'react-perfect-scrollbar/dist/css/styles.css';
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { SelectField } from '@aws-amplify/ui-react';
 
 ChartJS.register(
   CategoryScale,
@@ -38,13 +41,20 @@ ChartJS.register(
   Legend
 );
 
-// Custom Leaflet Marker Icon to fix missing icon issue
+// Custom Leaflet Marker Icon to fix missing icon issue - For the Map
 const customIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
 });
+
+interface WeatherStation {
+  stationKey: string;
+  stationName: string;
+  latitude: number;
+  longitude: number;
+}
 
 const client = generateClient<Schema>();
 
@@ -53,20 +63,46 @@ function App() {
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
   const [weatherData, setWeatherData] = useState<Array<Schema["weatherData"]["type"]>>([]);
   const { user, signOut } = useAuthenticator();
-  const [stationKey, setStationKey] = useState<string | null>(null);
+  const [weatherStations, setWeatherStations] = useState<WeatherStation[]>([]);
+  const [selectedStation, setSelectedStation] = useState<WeatherStation | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error" | "info" | "warning">("success");
 
   useEffect(() => {
     client.models.weatherData.observeQuery().subscribe({
       next: (data) => setWeatherData([...data.items]),
     });
   }, []);
-  
+
+  useEffect(() => {
+    const fetchWeatherStations = async () => {
+      try {
+        const response = await fetch("/data/weatherStations.json");
+        if (!response.ok) {
+          throw new Error("Failed to fetch weather stations");
+        }
+        const stations = await response.json();
+        setWeatherStations(stations);
+        setSelectedStation(stations[0]); // Set the first station as default
+      } catch (error) {
+        console.error("Error fetching weather stations:", error);
+      }
+    };
+    fetchWeatherStations();
+  }, []);
+
+  useEffect(() => {
+    if (selectedStation) {
+      fetchWeatherData();
+    }
+  }, [selectedStation]);
 
   useEffect(() => {
     client.models.telemetry.observeQuery().subscribe({
       next: (data) => setTelemetry([...data.items]),
     });
-
     client.models.devices.observeQuery().subscribe({
       next: (data) => setDevices([...data.items]),
     });
@@ -78,51 +114,68 @@ function App() {
       client.models.devices.create({ device_id: device, owner: user.userId });
     }
   };
+  
+  const deleteDevice = (device_id: string) => {
+    client.models.devices.delete({ device_id });
+  };
 
   const createStation = () => {
-    const stationKey = String(window.prompt("Station Key"));
-    if (stationKey) {
-      client.models.weatherStation.create({ stationKey: stationKey, owner: user.userId })
-      .then(() => {
-        console.log("Weather station created successfully.");
-        setStationKey(stationKey);  
+    const newStationKey = String(window.prompt("Enter a new Station Key"));
+    if (newStationKey) {
+      client.models.weatherStation
+        .create({ stationKey: newStationKey, owner: user.userId })
+        .then(() => {
+          console.log("Weather station created successfully.");
+          setSnackbarMessage("Weather station created successfully!");
+          setSnackbarSeverity("success");
+          setSnackbarOpen(true);
     })
     .catch((error) => {
+      setSnackbarMessage("Error creating weather station. Please try again.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
       console.error("Error creating weather station:", error);
     });
     }
   };
 
-  const deleteDevice = (device_id: string) => {
-    client.models.devices.delete({ device_id });
+  const handleStationChange = (key: string) => {
+    const station = weatherStations.find((ws) => ws.stationKey === key);
+    if (station) {
+      setSelectedStation(station);
+    }
   };
 
-  /*const deleteStation = (stationKey: string) => {
-    client.models.weatherStation.delete({ stationKey });
-  };*/
+const fetchWeatherData = async () => {
+  const API_GATEWAY_URL =
+    "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
+    setIsLoading(true);
+  try {
+    if (!selectedStation) {
+      throw new Error("No station selected. Please select a station.");
+    }
+    const payload = { stationKey: selectedStation.stationKey };
+    const response = await fetch(API_GATEWAY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const fetchWeatherData = async () => {
-    const API_GATEWAY_URL =
-      "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
-    try {
-      if (!stationKey) {
-        throw new Error("Station Key is not set. Please create a station first.");
-      }
-      const payload = {stationKey};
-      const response = await fetch(API_GATEWAY_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"},
-          body: JSON.stringify(payload),
-        });
-      if (!response.ok) {
-        throw new Error(`Failed to trigger Lambda: ${response.statusText}`);
-      }
-      console.log("Weather data fetch triggered successfully.");
+    if (!response.ok) {
+      throw new Error(`Failed to fetch weather data: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    setWeatherData(data);
+    console.log("Weather data fetch triggered successfully.");
   } catch (error) {
     console.error("Error fetching weather data:", error);
+  } finally {
+    setIsLoading(false);
   }
-}
+};
   
   const chartData = {
     labels: telemetries.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
@@ -329,6 +382,20 @@ function App() {
       flexShrink: 0,
       alignItems: "center" 
       }}>
+<Snackbar
+  open={snackbarOpen}
+  autoHideDuration={3000} // Closes after 3 seconds
+  onClose={() => setSnackbarOpen(false)}
+  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+>
+<Alert
+onClose={() => setSnackbarOpen(false)}
+severity={snackbarSeverity}
+sx={{ width: "80%" }}
+  >
+  {snackbarMessage}
+</Alert>
+</Snackbar>
       {/* Overview Section */}
       <Card sx={{ 
         mb: 3, 
@@ -375,8 +442,15 @@ function App() {
   </CardContent>
 </Card>
 
+<Box>
+    {isLoading && (
+      <Box sx={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
+        <CircularProgress color="primary" />
+      </Box>
+      )}
+</Box>
+
 {/* Devices Section */}
-<PerfectScrollbar>
 <Box sx={{ 
   mb: 3, 
   width: "100%",
@@ -471,13 +545,28 @@ function App() {
         <Card
           sx={{
             mb: 3,
-            width: "100%",
+            width: "60%",
             maxWidth: "1100px",
             backgroundColor: "#1a1a2e",
             color: "#fff",
           }}
         >
           <CardContent>
+          <SelectField
+          label="Select Weatherstation"
+          value={selectedStation?.stationKey || ""}
+          onChange={(e) => handleStationChange(e.target.value)}
+          >
+          {weatherStations.length > 0 ? (
+          weatherStations.map((station) => (
+          <option key={station.stationKey} value={station.stationKey}>
+          {station.stationName}
+        </option>
+      ))
+      ) : (
+        <option disabled>No stations available</option>
+         )}
+        </SelectField>
             <Typography variant="subtitle1" textAlign="center">
               Station: {weatherData[0]?.stationName || "N/A"} <br />
               Location 'latitude': {weatherData[0]?.latitude}, 'longitude':{" "}
@@ -487,59 +576,62 @@ function App() {
           </CardContent>
         </Card>
 
-        {/* Map Section */}
-        <Box
-          sx={{
-            mt: 3,
-            mb: 3,
-            width: "100%",
-            maxWidth: "1100px",
-            borderRadius: "8px",
-            background: "#1a1a2e",
-          }}
-        >
-          <Typography
-            variant="h5"
-            sx={{
-              textAlign: "center",
-              padding: "10px",
-              color: "#fff",
-            }}
-          >
-            Weather Station Map
-          </Typography>
-          <MapContainer
-            center={[
-              weatherData[0]?.latitude || 59.3293,
-              weatherData[0]?.longitude || 18.0686,
-            ]}
-            zoom={10}
-            style={{ height: "400px", width: "100%" }}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-            />
-            {weatherData.length > 0 && (
-              <Marker
-                position={[
-                  weatherData[0]?.latitude ?? 0,
-                  weatherData[0]?.longitude ?? 0,
-                ]}
-                icon={customIcon}
-              >
-                <Popup>
-                  <strong>Station:</strong> {weatherData[0]?.stationName || "N/A"}{" "}
-                  <br />
-                  <strong>Temperature:</strong>{" "}
-                  {weatherData[0]?.temperature || "N/A"}°C
-                </Popup>
-              </Marker>
+{/* Map Section */}
+<Box
+  sx={{
+    mt: 3,
+    mb: 3,
+    width: "60%",
+    maxWidth: "1100px",
+    borderRadius: "8px",
+    background: "#1a1a2e",
+    alignContent: "center",
+    }}
+    >
+    <Typography
+    variant="h5"
+    sx={{
+    textAlign: "center",
+    padding: "10px",
+    color: "#fff",
+      }}
+    >
+    Weather Station Map
+    </Typography>
+    <MapContainer
+  center={[
+    weatherData[0]?.latitude || 59.3293,
+    weatherData[0]?.longitude || 18.0686,
+  ]}
+  zoom={10}
+  style={{ height: "400px", width: "100%" }}
+>
+  <TileLayer
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+  />
+  {weatherData.length > 0 ? (
+    <Marker
+      position={[
+        weatherData[0]?.latitude ?? 0,
+        weatherData[0]?.longitude ?? 0,
+      ]}
+      icon={customIcon}
+    >
+      <Popup>
+        <strong>Station:</strong> {weatherData[0]?.stationName || "N/A"} <br />
+        <strong>Temperature:</strong> {weatherData[0]?.temperature || "N/A"}°C
+      </Popup>
+    </Marker>
+  ) : (
+    <Marker position={[59.3293, 18.0686]} icon={customIcon}>
+      <Popup>No weather data available</Popup>
+    </Marker>
   )}
-  </MapContainer>
+</MapContainer>
 </Box>
-</PerfectScrollbar>
 
+{/* Action Buttons */}
 <Button onClick={createStation} variant="contained" color="primary">
 Create Weather Station
 </Button>
@@ -547,9 +639,10 @@ Create Weather Station
 <Button
 variant="contained"
 color="primary"
+disabled={isLoading}
 onClick={fetchWeatherData}
 >
-Fetch SMHI Weather Data
+{isLoading ? <CircularProgress size={20} /> : "Fetch SMHI Weather Data"}
 </Button>
 
 

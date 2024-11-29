@@ -1,0 +1,23 @@
+[
+  {
+    "stationKey": "97200",
+    "stationName": "Stockholm-Bromma Flygplats",
+    "latitude": 59.3537,
+    "longitude": 17.9513,
+    "smhiUrl": "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/97200/period/latest-hour/data.json"
+  },
+  {
+    "stationKey": "98230",
+    "stationName": "Stockholm-Observatoriekullen A",
+    "latitude": 59.3417,
+    "longitude": 18.0549,
+    "smhiUrl": "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/98230/period/latest-hour/data.json"
+  },
+  {
+    "stationKey": "71420",
+    "stationName": "Göteborg A",
+    "latitude": 57.7,
+    "longitude": 11.97,
+    "smhiUrl": "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/71420/period/latest-hour/data.json"
+  }
+]

@@ -1,9 +1,17 @@
 import { Handler } from "aws-lambda";
 
-const SMHI_URL =
-  "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/97200/period/latest-hour/data.json";
+const SMHI_URL_BROMMA = "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/97200/period/latest-hour/data.json";
+const SMHI_URL_STOCKHOLM = "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/98230/period/latest-hour/data.json";
+const SMHI_URL_GOTEBORG = "https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/71420/period/latest-hour/data.json";
 const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
+
+// Map station keys to URLs
+const stationUrls: Record<string, string> = {
+  "97200": SMHI_URL_BROMMA,
+  "98230": SMHI_URL_STOCKHOLM,
+  "71420": SMHI_URL_GOTEBORG,
+};
 
 export const handler: Handler = async (event) => {
   console.log(`EVENT: ${JSON.stringify(event)}`);
@@ -32,16 +40,19 @@ export const handler: Handler = async (event) => {
   let responseBody;
 
   try {
-    // Parse stationKey from the payload
+    // Parse stationKey from the request body
     const { stationKey } = JSON.parse(event.body || "{}");
-    if (!stationKey) {
-      throw new Error("'stationKey' is missing in the request payload.");
-    }
-    console.log(`Received stationKey: ${stationKey}`);
+
+    // Validate stationKey and get the corresponding URL
+    const smhiUrl = stationUrls[stationKey];
+    if (!stationKey || !smhiUrl) {
+      throw new Error(`Invalid or missing stationKey: ${stationKey}`);
+      }
+    console.log(`Received stationKey: ${stationKey}, SMHI URL: ${smhiUrl}`);
 
     // Step 1: Fetch SMHI data
     console.log("Fetching data from SMHI API...");
-    const smhiResponse = await fetch(SMHI_URL);
+    const smhiResponse = await fetch(smhiUrl);
     if (!smhiResponse.ok) {
       throw new Error(`Failed to fetch SMHI data: ${smhiResponse.statusText}`);
     }
@@ -144,6 +155,7 @@ export const handler: Handler = async (event) => {
 };
 
 const checkExistingData = async (stationKey: string, timestamp: number) => {
+  console.log(`Checking if data exists for stationKey: ${stationKey}, timestamp: ${timestamp}`);
   const query = `
     query CheckWeatherData {
       getWeatherData(stationKey: "${stationKey}", timestamp: ${timestamp}) {
