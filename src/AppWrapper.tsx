@@ -1,6 +1,8 @@
 import React from "react";
+import ReactDOM from "react-dom";
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 import App from "./App";
+import ErrorBoundary from "./ErrorBoundary";
 
 const darkTheme = createTheme({
   palette: {
@@ -38,7 +40,9 @@ const AppWrapper: React.FC = () => {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline /> {/* Applies global baseline styles */}
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </ThemeProvider>
   );
 };
