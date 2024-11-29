@@ -63,7 +63,6 @@ function App() {
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
   const [weatherData, setWeatherData] = useState<Array<Schema["weatherData"]["type"]>>([]);
   const { user, signOut } = useAuthenticator();
-  const [weatherStations, setWeatherStations] = useState<WeatherStation[]>([]);
   const [selectedStation, setSelectedStation] = useState<WeatherStation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -75,29 +74,6 @@ function App() {
       next: (data) => setWeatherData([...data.items]),
     });
   }, []);
-
-  useEffect(() => {
-    const fetchWeatherStations = async () => {
-      try {
-        const response = await fetch("/data/weatherStations.json");
-        if (!response.ok) {
-          throw new Error("Failed to fetch weather stations");
-        }
-        const stations = await response.json();
-        setWeatherStations(stations);
-        setSelectedStation(stations[0]); // Set the first station as default
-      } catch (error) {
-        console.error("Error fetching weather stations:", error);
-      }
-    };
-    fetchWeatherStations();
-  }, []);
-
-  useEffect(() => {
-    if (selectedStation) {
-      fetchWeatherData();
-    }
-  }, [selectedStation]);
 
   useEffect(() => {
     client.models.telemetry.observeQuery().subscribe({
@@ -139,19 +115,12 @@ function App() {
     }
   };
 
-  const handleStationChange = (key: string) => {
-    const station = weatherStations.find((ws) => ws.stationKey === key);
-    if (station) {
-      setSelectedStation(station);
-    }
-  };
-
 const fetchWeatherData = async () => {
   const API_GATEWAY_URL =
     "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
     setIsLoading(true);
   try {
-    if (!selectedStation) {
+    if (!selectedStation?.stationKey) {
       throw new Error("No station selected. Please select a station.");
     }
     const payload = { stationKey: selectedStation.stationKey };
@@ -169,11 +138,18 @@ const fetchWeatherData = async () => {
 
     const data = await response.json();
     setWeatherData(data);
+    setSnackbarMessage("Weather data fetched successfully!");
+    setSnackbarSeverity("success")
     console.log("Weather data fetch triggered successfully.");
   } catch (error) {
+    if (error instanceof Error) {
+      setSnackbarMessage(error.message || "Failed to fetch weather data.");
+    }
+    setSnackbarSeverity("error");
     console.error("Error fetching weather data:", error);
   } finally {
     setIsLoading(false);
+    setSnackbarOpen(true);
   }
 };
   
@@ -542,39 +518,34 @@ sx={{ width: "80%" }}
 </Card>
 
 {/* SMHI Weather Data Chart Section */}
-        <Card
-          sx={{
-            mb: 3,
-            width: "60%",
-            maxWidth: "1100px",
-            backgroundColor: "#1a1a2e",
-            color: "#fff",
-          }}
-        >
-          <CardContent>
-          <SelectField
-          label="Select Weatherstation"
-          value={selectedStation?.stationKey || ""}
-          onChange={(e) => handleStationChange(e.target.value)}
-          >
-          {weatherStations.length > 0 ? (
-          weatherStations.map((station) => (
-          <option key={station.stationKey} value={station.stationKey}>
-          {station.stationName}
-        </option>
-      ))
-      ) : (
-        <option disabled>No stations available</option>
-         )}
-        </SelectField>
-            <Typography variant="subtitle1" textAlign="center">
-              Station: {weatherData[0]?.stationName || "N/A"} <br />
-              Location 'latitude': {weatherData[0]?.latitude}, 'longitude':{" "}
-              {weatherData[0]?.longitude}
-            </Typography>
-            <Line data={smhiChartData} options={smhiChartOptions} />
-          </CardContent>
-        </Card>
+<Card
+  sx={{
+    mb: 3,
+    width: "60%",
+    maxWidth: "1100px",
+    backgroundColor: "#1a1a2e",
+    color: "#fff",
+  }}
+  >
+  <CardContent>
+    <SelectField
+      disabled={isLoading}
+      label="Select Weather Station"
+      value={selectedStation?.stationKey || ""}
+      onChange={(e) => setSelectedStation({ stationKey: e.target.value, stationName: "", latitude: 0, longitude: 0 })}
+      >
+    <option value="97200">Bromma</option>
+    <option value="98230">Stockholm</option>
+    <option value="71420">Göteborg</option>
+    </SelectField>
+    <Typography variant="subtitle1" textAlign="center">
+    Station: {weatherData[0]?.stationName || "N/A"} <br />
+    Location 'latitude': {weatherData[0]?.latitude}, 'longitude':{" "}
+    {weatherData[0]?.longitude}
+    </Typography>
+    <Line data={smhiChartData} options={smhiChartOptions} />
+  </CardContent>
+</Card>
 
 {/* Map Section */}
 <Box

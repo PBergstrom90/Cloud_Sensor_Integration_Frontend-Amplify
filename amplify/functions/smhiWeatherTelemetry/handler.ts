@@ -123,18 +123,15 @@ export const handler: Handler = async (event) => {
         }
       }
     `;
-
     const graphqlResponse = await fetch(GRAPHQL_ENDPOINT, {
       method: "POST",
       headers,
       body: JSON.stringify({ query: mutation }),
     });
-
     const graphqlData = await graphqlResponse.json();
     if (graphqlData.errors) {
       throw new Error(`GraphQL mutation failed: ${JSON.stringify(graphqlData.errors)}`);
     }
-
     console.log("Weather station data saved successfully:", graphqlData.data);
     responseBody = graphqlData.data;
   } catch (error) {
