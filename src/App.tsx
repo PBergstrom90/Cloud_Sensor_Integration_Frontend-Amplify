@@ -137,6 +137,14 @@ const fetchWeatherData = async () => {
     }
 
     const data = await response.json();
+
+    console.log("Weather data fetched:", data);
+    
+    // Ensure data is an array
+     if (!Array.isArray(data)) {
+      throw new Error("Unexpected response format: Weather data is not an array.");
+    }
+
     setWeatherData(data);
     setSnackbarMessage("Weather data fetched successfully!");
     setSnackbarSeverity("success")
@@ -154,11 +162,15 @@ const fetchWeatherData = async () => {
 };
   
   const chartData = {
-    labels: telemetries.map((data) => moment(data?.timestamp).format("HH:mm:ss")),
-    datasets: [
-      {
-        label: "Temperature",
-        data: telemetries.map((data) => data?.temperature),
+    labels: Array.isArray(telemetries)
+    ? telemetries.map((data) => moment(data?.timestamp).format("HH:mm:ss"))
+    : [],
+  datasets: [
+    {
+      label: "Temperature",
+      data: Array.isArray(telemetries)
+        ? telemetries.map((data) => data?.temperature)
+        : [],
         borderColor: "rgba(255, 99, 132, 1)",
         backgroundColor: "rgba(255, 99, 132, 0.3)",
         fill: true, 
@@ -170,7 +182,9 @@ const fetchWeatherData = async () => {
       },
       {
         label: "Humidity",
-        data: telemetries.map((data) => data?.humidity),
+        data: Array.isArray(telemetries)
+        ? telemetries.map((data) => data?.humidity)
+        : [],
         borderColor: "rgba(99, 255, 132, 1)",
         backgroundColor: "rgba(99, 255, 132, 0.3)",
         fill: true,
@@ -267,11 +281,15 @@ const fetchWeatherData = async () => {
   };
 
   const smhiChartData = {
-    labels: weatherData.map((data) => moment.unix(data?.timestamp).format("HH:mm:ss")),
-    datasets: [
-      {
-        label: "SMHI Temperature",
-        data: weatherData.map((data) => data?.temperature),
+    labels: Array.isArray(weatherData)
+    ? weatherData.map((data) => moment.unix(data?.timestamp).format("HH:mm:ss"))
+    : [],
+  datasets: [
+    {
+      label: "SMHI Temperature",
+      data: Array.isArray(weatherData)
+        ? weatherData.map((data) => data?.temperature)
+        : [],
         borderColor: "rgba(54, 162, 235, 1)", // Blue
         backgroundColor: "rgba(54, 162, 235, 0.3)", // Light Blue
         fill: true,
@@ -518,34 +536,60 @@ sx={{ width: "80%" }}
 </Card>
 
 {/* SMHI Weather Data Chart Section */}
-<Card
-  sx={{
-    mb: 3,
-    width: "60%",
-    maxWidth: "1100px",
-    backgroundColor: "#1a1a2e",
-    color: "#fff",
-  }}
+{Array.isArray(weatherData) && weatherData.length > 0 ? (
+  <Card
+    sx={{
+      mb: 3,
+      width: "60%",
+      maxWidth: "1100px",
+      backgroundColor: "#1a1a2e",
+      color: "#fff",
+    }}
   >
-  <CardContent>
-    <SelectField
-      disabled={isLoading}
-      label="Select Weather Station"
-      value={selectedStation?.stationKey || ""}
-      onChange={(e) => setSelectedStation({ stationKey: e.target.value, stationName: "", latitude: 0, longitude: 0 })}
+    <CardContent>
+      <SelectField
+        disabled={isLoading}
+        label="Select Weather Station"
+        value={selectedStation?.stationKey || ""}
+        onChange={(e) =>
+          setSelectedStation({
+            stationKey: e.target.value,
+            stationName: "",
+            latitude: 0,
+            longitude: 0,
+          })
+        }
       >
-    <option value="97200">Bromma</option>
-    <option value="98230">Stockholm</option>
-    <option value="71420">Göteborg</option>
-    </SelectField>
-    <Typography variant="subtitle1" textAlign="center">
-    Station: {weatherData[0]?.stationName || "N/A"} <br />
-    Location 'latitude': {weatherData[0]?.latitude}, 'longitude':{" "}
-    {weatherData[0]?.longitude}
+        <option value="97200">Bromma</option>
+        <option value="98230">Stockholm</option>
+        <option value="71420">Göteborg</option>
+      </SelectField>
+      <Typography variant="subtitle1" textAlign="center">
+        Station: {weatherData[0]?.stationName || "N/A"} <br />
+        Location 'latitude': {weatherData[0]?.latitude}, 'longitude':{" "}
+        {weatherData[0]?.longitude}
+      </Typography>
+      <Line data={smhiChartData} options={smhiChartOptions} />
+    </CardContent>
+  </Card>
+) : (
+  <Card
+    sx={{
+      mb: 3,
+      width: "60%",
+      maxWidth: "1100px",
+      backgroundColor: "#1a1a2e",
+      color: "#fff",
+      textAlign: "center",
+      padding: "20px",
+    }}
+  >
+    <Typography variant="h6" color="error">
+      No weather data available. Please fetch data or select a valid station.
     </Typography>
-    <Line data={smhiChartData} options={smhiChartOptions} />
-  </CardContent>
-</Card>
+  </Card>
+)}
+
 
 {/* Map Section */}
 <Box
