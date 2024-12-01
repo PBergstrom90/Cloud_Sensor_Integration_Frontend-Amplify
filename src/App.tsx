@@ -13,7 +13,7 @@ import {
 import { Line } from "react-chartjs-2";
 import moment from "moment";
 import { useAuthenticator } from "@aws-amplify/ui-react";
-import type { Schema } from "../amplify/data/resource";
+import { type Schema } from "../amplify/data/resource";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -62,9 +62,11 @@ function App() {
   const [telemetries, setTelemetry] = useState<Array<Schema["telemetry"]["type"]>>([]);
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
   const [weatherData, setWeatherData] = useState<Array<Schema["weatherData"]["type"]>>([]);
-  const { user, signOut } = useAuthenticator();
   const [selectedStation, setSelectedStation] = useState<WeatherStation | null>(null);
+  
+  const {user, signOut } = useAuthenticator();
   const [isLoading, setIsLoading] = useState(false);
+  
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error" | "info" | "warning">("success");
@@ -93,6 +95,10 @@ function App() {
   
   const deleteDevice = (device_id: string) => {
     client.models.devices.delete({ device_id });
+  };
+
+  const deleteTelemetry = (device_id: string, timestamp: number) => {
+    client.models.telemetry.delete({ device_id, timestamp });
   };
 
   const createStation = () => {
@@ -137,7 +143,6 @@ const fetchWeatherData = async () => {
     }
 
     const data = await response.json();
-
     console.log("Weather data fetched:", data);
     
     // Ensure data is an array
@@ -199,6 +204,13 @@ const fetchWeatherData = async () => {
   
   const chartOptions: ChartOptions<"line"> = {
     responsive: true,
+    onClick: function (evt: any, element: string | any[]) {
+      evt;
+      if (element.length > 0) {
+        var ind = element[0].index;
+        deleteTelemetry(telemetries[ind].device_id, telemetries[ind].timestamp)
+      }
+    },
     plugins: {
       legend: {
         position: "top",
@@ -282,14 +294,18 @@ const fetchWeatherData = async () => {
 
   const smhiChartData = {
     labels: Array.isArray(weatherData)
-    ? weatherData.map((data) => moment.unix(data?.timestamp).format("HH:mm:ss"))
-    : [],
-  datasets: [
-    {
-      label: "SMHI Temperature",
-      data: Array.isArray(weatherData)
-        ? weatherData.map((data) => data?.temperature)
-        : [],
+      ? weatherData
+          .filter((data) => data.stationKey === selectedStation?.stationKey)
+          .map((data) => moment.unix(data?.timestamp).format("HH:mm:ss"))
+      : [],
+    datasets: [
+      {
+        label: "Temperature",
+        data: Array.isArray(weatherData)
+          ? weatherData
+              .filter((data) => data.stationKey === selectedStation?.stationKey)
+              .map((data) => data?.temperature)
+          : [],
         borderColor: "rgba(54, 162, 235, 1)", // Blue
         backgroundColor: "rgba(54, 162, 235, 0.3)", // Light Blue
         fill: true,
@@ -540,34 +556,41 @@ sx={{ width: "80%" }}
   <Card
     sx={{
       mb: 3,
-      width: "60%",
+      width: "80%",
       maxWidth: "1100px",
       backgroundColor: "#1a1a2e",
       color: "#fff",
     }}
   >
     <CardContent>
-      <SelectField
-        disabled={isLoading}
-        label="Select Weather Station"
-        value={selectedStation?.stationKey || ""}
-        onChange={(e) =>
-          setSelectedStation({
-            stationKey: e.target.value,
-            stationName: "",
-            latitude: 0,
-            longitude: 0,
-          })
-        }
-      >
-        <option value="97200">Bromma</option>
-        <option value="98230">Stockholm</option>
-        <option value="71420">Göteborg</option>
-      </SelectField>
+      <div style={{ color: "white" }}>
+        <label style={{ color: "white" }}>Select Weather Station</label>
+        <SelectField
+          label=""
+          disabled={isLoading}
+          placeholder="Please select a station"
+          options={["97200", "98230", "71420"]}
+          value={selectedStation?.stationKey || ""}
+          onChange={(e) => {
+            const selectedKey = e.target.value;
+            const selectedWeatherData = weatherData.find(
+              (data) => data.stationKey === selectedKey
+            );
+            if (selectedWeatherData) {
+              setSelectedStation({
+                stationKey: selectedWeatherData.stationKey,
+                stationName: selectedWeatherData.stationName || "Unknown Station",
+                latitude: selectedWeatherData.latitude ?? 0,
+                longitude: selectedWeatherData.longitude ?? 0,
+              });
+            }
+          }}
+        ></SelectField>
+      </div>
       <Typography variant="subtitle1" textAlign="center">
-        Station: {weatherData[0]?.stationName || "N/A"} <br />
-        Location 'latitude': {weatherData[0]?.latitude}, 'longitude':{" "}
-        {weatherData[0]?.longitude}
+        Station: {selectedStation?.stationName || "N/A"} <br />
+        Location 'latitude': {selectedStation?.latitude}, 'longitude':{" "}
+        {selectedStation?.longitude}
       </Typography>
       <Line data={smhiChartData} options={smhiChartOptions} />
     </CardContent>
@@ -590,7 +613,6 @@ sx={{ width: "80%" }}
   </Card>
 )}
 
-
 {/* Map Section */}
 <Box
   sx={{
@@ -601,52 +623,57 @@ sx={{ width: "80%" }}
     borderRadius: "8px",
     background: "#1a1a2e",
     alignContent: "center",
-    }}
-    >
-    <Typography
+  }}
+>
+  <Typography
     variant="h5"
     sx={{
-    textAlign: "center",
-    padding: "10px",
-    color: "#fff",
-      }}
-    >
+      textAlign: "center",
+      padding: "10px",
+      color: "#fff",
+    }}
+  >
     Weather Station Map
-    </Typography>
-    <MapContainer
-  center={[
-    weatherData[0]?.latitude || 59.3293,
-    weatherData[0]?.longitude || 18.0686,
-  ]}
-  zoom={10}
-  style={{ height: "400px", width: "100%" }}
->
-  <TileLayer
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-  />
-  {weatherData.length > 0 ? (
-    <Marker
-      position={[
-        weatherData[0]?.latitude ?? 0,
-        weatherData[0]?.longitude ?? 0,
-      ]}
-      icon={customIcon}
+  </Typography>
+  <MapContainer
+    center={[
+      selectedStation?.latitude || 59.3293,
+      selectedStation?.longitude || 18.0686,
+    ]}
+    zoom={10}
+    style={{ height: "400px", width: "100%" }}
+  >
+    <TileLayer
+      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+    />
+    {selectedStation ? (
+  <Marker
+    position={[
+    selectedStation?.latitude || 0,
+    selectedStation?.longitude || 0,
+    ]}
+    icon={customIcon}
     >
-      <Popup>
-        <strong>Station:</strong> {weatherData[0]?.stationName || "N/A"} <br />
-        <strong>Temperature:</strong> {weatherData[0]?.temperature || "N/A"}°C
-      </Popup>
-    </Marker>
-  ) : (
+  <Popup>
+  <strong>Station:</strong> {selectedStation?.stationName || "N/A"} <br />
+  <strong>Temperature:</strong> {weatherData.filter((data) => data.stationKey === selectedStation?.stationKey)
+  .slice(-1)[0]?.temperature || "N/A"}{" "}°C <br />
+  <strong>Last Update:</strong>{" "}{weatherData.filter((data) => data.stationKey === selectedStation?.stationKey).slice(-1)[0]?.timestamp
+  ? moment.unix(weatherData.filter((data) => data.stationKey === selectedStation?.stationKey).slice(-1)[0]?.timestamp).format("HH.mm.ss"): "N/A"}
+  </Popup>
+</Marker>
+    ) : (
     <Marker position={[59.3293, 18.0686]} icon={customIcon}>
-      <Popup>No weather data available</Popup>
+    <Popup>No weather data available</Popup>
     </Marker>
-  )}
-</MapContainer>
+    )}
+  </MapContainer>
 </Box>
 
+
 {/* Action Buttons */}
+
 <Button onClick={createStation} variant="contained" color="primary">
 Create Weather Station
 </Button>
@@ -659,7 +686,6 @@ onClick={fetchWeatherData}
 >
 {isLoading ? <CircularProgress size={20} /> : "Fetch SMHI Weather Data"}
 </Button>
-
 
 {/* Sign Out Button */}
 <Button variant="contained" color="secondary" 

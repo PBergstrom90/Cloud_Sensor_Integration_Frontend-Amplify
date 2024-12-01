@@ -27,7 +27,7 @@ export const handler: Handler = async (event) => {
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ message: "CORS preflight response" }),
+      body: JSON.stringify([{ statusCode: 200, message: "CORS preflight response" }]),
     };
   }
 
@@ -37,7 +37,7 @@ export const handler: Handler = async (event) => {
   };
 
   let statusCode = 200;
-  let responseBody;
+  let responseBody: Array<Record<string, any>> = [];
 
   try {
     // Parse stationKey from the request body
@@ -47,7 +47,7 @@ export const handler: Handler = async (event) => {
     const smhiUrl = stationUrls[stationKey];
     if (!stationKey || !smhiUrl) {
       throw new Error(`Invalid or missing stationKey: ${stationKey}`);
-      }
+    }
     console.log(`Received stationKey: ${stationKey}, SMHI URL: ${smhiUrl}`);
 
     // Step 1: Fetch SMHI data
@@ -60,9 +60,8 @@ export const handler: Handler = async (event) => {
     const latestValue = smhiData.value[smhiData.value.length - 1];
     const position = smhiData.position[0];
     const unixTimestamp = Math.floor(latestValue.date / 1000);
-
     console.log("Fetched data from SMHI API:", {
-      stationKey: stationKey,
+      stationKey,
       timestamp: unixTimestamp,
       temperature: latestValue.value,
     });
@@ -75,7 +74,7 @@ export const handler: Handler = async (event) => {
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify({ message: "Data already exists" }),
+        body: JSON.stringify([{ statusCode: 200, message: "Data already exists", data: [] }]),
       };
     }
 
@@ -133,24 +132,32 @@ export const handler: Handler = async (event) => {
       throw new Error(`GraphQL mutation failed: ${JSON.stringify(graphqlData.errors)}`);
     }
     console.log("Weather station data saved successfully:", graphqlData.data);
-    responseBody = graphqlData.data;
+
+    // Wrap success data in an array with status code
+    responseBody = [
+      {
+        statusCode: 201,
+        message: "Weather data saved successfully",
+        data: graphqlData.data.createWeatherData,
+      },
+    ];
   } catch (error) {
     console.error("Error in Lambda function:", error);
     statusCode = 500;
-    if (error instanceof Error) {
-      responseBody = { errors: [{ message: error.message, stack: error.stack }] };
-    } else {
-      responseBody = { errors: [{ message: String(error) }] };
-    }
+    responseBody = [
+      {
+        statusCode: 500,
+        message: error instanceof Error ? error.message : "Unknown error occurred",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    ];
   }
-
   return {
     statusCode,
     headers: corsHeaders,
     body: JSON.stringify(responseBody),
   };
 };
-
 const checkExistingData = async (stationKey: string, timestamp: number) => {
   console.log(`Checking if data exists for stationKey: ${stationKey}, timestamp: ${timestamp}`);
   const query = `
@@ -161,7 +168,6 @@ const checkExistingData = async (stationKey: string, timestamp: number) => {
       }
     }
   `;
-
   const response = await fetch(GRAPHQL_ENDPOINT, {
     method: "POST",
     headers: {
@@ -170,12 +176,10 @@ const checkExistingData = async (stationKey: string, timestamp: number) => {
     },
     body: JSON.stringify({ query }),
   });
-
   const data = await response.json();
   if (data.errors) {
     console.error("Error checking existing data:", data.errors);
     throw new Error(`GraphQL query failed: ${JSON.stringify(data.errors)}`);
   }
-
   return data.data?.getWeatherData || null;
 };
