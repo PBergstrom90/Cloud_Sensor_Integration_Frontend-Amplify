@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import { 
+  useEffect, 
+  useState,
+} from "react";
 import { generateClient } from "aws-amplify/data";
 import {
   Card,
@@ -26,7 +29,11 @@ import {
   ChartOptions,
 } from "chart.js";
 import 'react-perfect-scrollbar/dist/css/styles.css';
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { 
+  MapContainer, 
+  TileLayer, 
+  Marker, 
+  Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { SelectField } from '@aws-amplify/ui-react';
@@ -63,7 +70,8 @@ function App() {
   const [devices, setDevices] = useState<Array<Schema["devices"]["type"]>>([]);
   const [weatherData, setWeatherData] = useState<Array<Schema["weatherData"]["type"]>>([]);
   const [selectedStation, setSelectedStation] = useState<WeatherStation | null>(null);
-  
+  const [stations, setStations] = useState<Array<{ stationKey: string; label: string }>>([]);
+
   const {user, signOut } = useAuthenticator();
   const [isLoading, setIsLoading] = useState(false);
   
@@ -75,6 +83,39 @@ function App() {
     client.models.weatherData.observeQuery().subscribe({
       next: (data) => setWeatherData([...data.items]),
     });
+  }, []);
+
+  useEffect(() => {
+    const fetchStations = async () => {
+      try {
+        const result = await client.models.weatherStation.list();
+        // Fetch dynamic station names and add them to stations
+        const fetchedStations = await Promise.all(
+          result.data.map(async (station) => {
+            let stationName = station.stationKey; // Default to stationKey if no name found
+            try {
+              const smhiResponse = await fetch(
+                `https://opendata-download-metobs.smhi.se/api/version/latest/parameter/1/station/${station.stationKey}/period/latest-hour/data.json`
+              );
+              const smhiData = await smhiResponse.json();
+              stationName = smhiData.station?.name || stationName;
+            } catch (error) {
+              console.error(`Failed to fetch station name for ${station.stationKey}`, error);
+            }
+            return {
+              ...station,
+              label: stationName,
+            };
+          })
+        );
+        setStations(fetchedStations);
+        console.log("Fetched stations with dynamic labels:", fetchedStations);
+      } catch (error) {
+        console.error("Error fetching stations:", error);
+        setStations([]); // Fallback to an empty array on error
+      }
+    };
+    fetchStations();
   }, []);
 
   useEffect(() => {
@@ -137,23 +178,24 @@ const fetchWeatherData = async () => {
       },
       body: JSON.stringify(payload),
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch weather data: ${response.statusText}`);
-    }
-
     const data = await response.json();
     console.log("Weather data fetched:", data);
     
-    // Ensure data is an array
-     if (!Array.isArray(data)) {
+    if (!Array.isArray(data)) {
       throw new Error("Unexpected response format: Weather data is not an array.");
     }
-
+    if (!response.ok) {
+      throw new Error(`Failed to fetch weather data: ${response.statusText}`);
+    }
+    
     setWeatherData(data);
     setSnackbarMessage("Weather data fetched successfully!");
     setSnackbarSeverity("success")
     console.log("Weather data fetch triggered successfully.");
+    
+    // Reload the page to update the map (TEMPORARY FIX, can be improved in the future)
+    window.location.reload();
+
   } catch (error) {
     if (error instanceof Error) {
       setSnackbarMessage(error.message || "Failed to fetch weather data.");
@@ -293,19 +335,15 @@ const fetchWeatherData = async () => {
   };
 
   const smhiChartData = {
-    labels: Array.isArray(weatherData)
-      ? weatherData
+    labels: weatherData
           .filter((data) => data.stationKey === selectedStation?.stationKey)
-          .map((data) => moment.unix(data?.timestamp).format("HH:mm:ss"))
-      : [],
+          .map((data) => moment.unix(data?.timestamp).format("YYYY-MM:DD HH:mm:ss")),
     datasets: [
       {
         label: "Temperature",
-        data: Array.isArray(weatherData)
-          ? weatherData
+        data: weatherData
               .filter((data) => data.stationKey === selectedStation?.stationKey)
-              .map((data) => data?.temperature)
-          : [],
+              .map((data) => data?.temperature),
         borderColor: "rgba(54, 162, 235, 1)", // Blue
         backgroundColor: "rgba(54, 162, 235, 0.3)", // Light Blue
         fill: true,
@@ -330,6 +368,12 @@ const fetchWeatherData = async () => {
       },
       tooltip: {
         callbacks: {
+          title: (tooltipItems) => {
+            const index = tooltipItems[0]?.dataIndex;
+            const item = weatherData
+              .filter((data) => data.stationKey === selectedStation?.stationKey)[index];
+            return moment.unix(item?.timestamp).format("YYYY-MM-DD HH:mm:ss");
+          },
           label: (tooltipItem) =>
             `${tooltipItem.dataset.label}: ${tooltipItem.raw}°C`,
         },
@@ -552,7 +596,7 @@ sx={{ width: "80%" }}
 </Card>
 
 {/* SMHI Weather Data Chart Section */}
-{Array.isArray(weatherData) && weatherData.length > 0 ? (
+{weatherData && weatherData.length > 0 ? (
   <Card
     sx={{
       mb: 3,
@@ -569,23 +613,27 @@ sx={{ width: "80%" }}
           label=""
           disabled={isLoading}
           placeholder="Please select a station"
-          options={["97200", "98230", "71420"]}
+          //options={stations.map((station) => station.stationKey)}
           value={selectedStation?.stationKey || ""}
           onChange={(e) => {
             const selectedKey = e.target.value;
             const selectedWeatherData = weatherData.find(
               (data) => data.stationKey === selectedKey
             );
-            if (selectedWeatherData) {
-              setSelectedStation({
-                stationKey: selectedWeatherData.stationKey,
-                stationName: selectedWeatherData.stationName || "Unknown Station",
-                latitude: selectedWeatherData.latitude ?? 0,
-                longitude: selectedWeatherData.longitude ?? 0,
-              });
-            }
+            setSelectedStation({
+              stationKey: selectedKey,
+              stationName: selectedWeatherData?.stationName || "Unknown Station",
+              latitude: selectedWeatherData?.latitude ?? 59.3293, // Default latitude
+              longitude: selectedWeatherData?.longitude ?? 18.0686, // Default longitude
+            });
           }}
-        ></SelectField>
+          >
+  {stations.map((station) => (
+  <option key={station.stationKey} value={station.stationKey}>
+  {station.label}
+  </option>
+  ))}
+  </SelectField>
       </div>
       <Typography variant="subtitle1" textAlign="center">
         Station: {selectedStation?.stationName || "N/A"} <br />
@@ -660,7 +708,7 @@ sx={{ width: "80%" }}
   <strong>Temperature:</strong> {weatherData.filter((data) => data.stationKey === selectedStation?.stationKey)
   .slice(-1)[0]?.temperature || "N/A"}{" "}°C <br />
   <strong>Last Update:</strong>{" "}{weatherData.filter((data) => data.stationKey === selectedStation?.stationKey).slice(-1)[0]?.timestamp
-  ? moment.unix(weatherData.filter((data) => data.stationKey === selectedStation?.stationKey).slice(-1)[0]?.timestamp).format("HH.mm.ss"): "N/A"}
+  ? moment.unix(weatherData.filter((data) => data.stationKey === selectedStation?.stationKey).slice(-1)[0]?.timestamp).format("HH.mm"): "N/A"}
   </Popup>
 </Marker>
     ) : (

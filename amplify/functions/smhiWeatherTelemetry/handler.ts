@@ -6,7 +6,7 @@ const SMHI_URL_GOTEBORG = "https://opendata-download-metobs.smhi.se/api/version/
 const GRAPHQL_ENDPOINT = process.env.API_ENDPOINT as string;
 const GRAPHQL_API_KEY = process.env.API_KEY as string;
 
-// Map station keys to URLs
+// Map station keys to SMHI Opendata-URLs
 const stationUrls: Record<string, string> = {
   "97200": SMHI_URL_BROMMA,
   "98230": SMHI_URL_STOCKHOLM,
