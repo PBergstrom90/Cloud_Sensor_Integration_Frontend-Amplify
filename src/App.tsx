@@ -68,12 +68,14 @@ function App() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error" | "info" | "warning">("success");
 
+  // Fetch weather data from the database
   useEffect(() => {
     client.models.weatherData.observeQuery().subscribe({
       next: (data) => setWeatherData([...data.items]),
     });
   }, []);
 
+  // Fetch weather stations and their names
   useEffect(() => {
     const fetchStations = async () => {
       try {
@@ -107,6 +109,7 @@ function App() {
     fetchStations();
   }, []);
 
+  // Fetch data from the database
   useEffect(() => {
     client.models.telemetry.observeQuery().subscribe({
       next: (data) => setTelemetry(data.items.map(item => ({
@@ -123,6 +126,7 @@ function App() {
     });
   }, []);
 
+  // Create a new device in the database
   const createDevice = () => {
     const device = String(window.prompt("Device ID"));
     if (device) {
@@ -130,14 +134,17 @@ function App() {
     }
   };
   
+  // Delete device from the database
   const deleteDevice = (device_id: string) => {
     client.models.devices.delete({ device_id });
   };
 
+  // Delete device telemetry data
   const deleteTelemetry = (device_id: string, timestamp: number) => {
     client.models.telemetry.delete({ device_id, timestamp });
   };
 
+  // Create a new weather station in the database
   const createStation = () => {
     const newStationKey = String(window.prompt("Enter a new Station Key"));
     if (newStationKey) {
@@ -158,6 +165,7 @@ function App() {
     }
   };
 
+// Fetch weather data from the AWS Lambda function "smhiWeatherTelemetry"
 const fetchWeatherData = async () => {
   const API_GATEWAY_URL =
     "https://4b2wryytb8.execute-api.eu-central-1.amazonaws.com/default/amplify-d3c0g3rqfmqtvl-ma-smhiWeatherTelemetrylamb-sZKmSo6ygs8m";
@@ -206,6 +214,7 @@ const fetchWeatherData = async () => {
     setSnackbarOpen(true);
   }
 };
+
 
 {/* App Frontend */}
 return (
@@ -323,11 +332,8 @@ sx={{ width: "80%" }}
   </Card>
 )}
 
-<Button
-variant="contained"
-color="primary"
+<Button onClick={fetchWeatherData} variant="contained" color="primary" 
 disabled={isLoading}
-onClick={fetchWeatherData}
 >
 {isLoading ? <CircularProgress size={20} /> : "Fetch SMHI Weather Data"}
 </Button>
@@ -336,7 +342,7 @@ onClick={fetchWeatherData}
 <WeatherMap selectedStation={selectedStation} weatherData={weatherData} />
 
 <Button onClick={createStation} variant="contained" color="primary">
-Create Weather Station (Work in Progress)
+Create Weather Station
 </Button>
 
 {/* Sign Out Button */}

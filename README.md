@@ -19,3 +19,11 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
+
+## Sources
+
+[SMHI Open Data API](https://opendata.smhi.se/apidocs/metfcst/index.html)
+
+[AWS IoT Core Documentation](https://docs.aws.amazon.com/iot/)
+
+[AWS Amplify Documentation](https://docs.amplify.aws/react/how-amplify-works/)

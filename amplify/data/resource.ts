@@ -7,20 +7,20 @@ import {
 const schema = a.schema({
   telemetry: a
     .model({
-      device_id: a.string().required(),
-      timestamp: a.timestamp().required(),
-      temperature: a.float(),
-      humidity: a.float(),
-      owner: a.string().required()
+      device_id: a.string().required(), // Partition key
+      timestamp: a.timestamp().required(), // Sort key
+      temperature: a.float(), // Temperature value
+      humidity: a.float(),  // Humidity value
+      owner: a.string().required() // Session owner
     })
     .identifier(['device_id', 'timestamp'])
     .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
 
   devices: a
     .model({
-      device_id: a.string().required(),
-      owner: a.string().required(),
-      status: a.string(),
+      device_id: a.string().required(), // Partition key  
+      owner: a.string().required(), // Session owner
+      status: a.string(), // Status of device
     })
     .identifier(['device_id'])
     .authorization((allow) => [allow.owner(), allow.publicApiKey()]),
